@@ -2,3 +2,6 @@ __pycache__
 *.pyc
 *~
 /.tox
+/python_alsa_midi.egg-info
+/dist
+/build
