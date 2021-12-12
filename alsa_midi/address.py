@@ -18,6 +18,10 @@ class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id"), meta
         ...
 
     @overload
+    def __new__(cls, arg1: Tuple[int, int]) -> 'SequencerAddress':
+        ...
+
+    @overload
     def __new__(cls, arg1: str) -> 'SequencerAddress':
         ...
 
@@ -49,6 +53,9 @@ class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id"), meta
         result = asound.snd_seq_parse_address(ffi.NULL, addr_p, arg.encode())
         _check_alsa_error(result)
         return addr_p.client, addr_p.port
+
+    def __str__(self):
+        return f"{self.client_id}:{self.port_id}"
 
 
 ALL_SUBSCRIBERS = SequencerAddress(asound.SND_SEQ_ADDRESS_SUBSCRIBERS, 0)
