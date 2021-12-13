@@ -1,4 +1,5 @@
 
+from enum import IntFlag
 from typing import TYPE_CHECKING, Tuple, Union
 
 from ._ffi import asound
@@ -9,9 +10,41 @@ from .util import _check_alsa_error
 if TYPE_CHECKING:
     from .client import SequencerClient, _snd_seq_t_p
 
-READ_PORT = asound.SND_SEQ_PORT_CAP_READ | asound.SND_SEQ_PORT_CAP_SUBS_READ
-WRITE_PORT = asound.SND_SEQ_PORT_CAP_WRITE | asound.SND_SEQ_PORT_CAP_SUBS_WRITE
+
+class SequencerPortCaps(IntFlag):
+    READ = asound.SND_SEQ_PORT_CAP_READ
+    WRITE = asound.SND_SEQ_PORT_CAP_WRITE
+    SYNC_READ = asound.SND_SEQ_PORT_CAP_SYNC_READ
+    SYNC_WRITE = asound.SND_SEQ_PORT_CAP_SYNC_WRITE
+    DUPLEX = asound.SND_SEQ_PORT_CAP_DUPLEX
+    SUBS_READ = asound.SND_SEQ_PORT_CAP_SUBS_READ
+    SUBS_WRITE = asound.SND_SEQ_PORT_CAP_SUBS_WRITE
+    NO_EXPORT = asound.SND_SEQ_PORT_CAP_NO_EXPORT
+
+
+class SequencerPortType(IntFlag):
+    SPECIFIC = asound.SND_SEQ_PORT_TYPE_SPECIFIC
+    MIDI_GENERIC = asound.SND_SEQ_PORT_TYPE_MIDI_GENERIC
+    MIDI_GM = asound.SND_SEQ_PORT_TYPE_MIDI_GM
+    MIDI_GS = asound.SND_SEQ_PORT_TYPE_MIDI_GS
+    MIDI_XG = asound.SND_SEQ_PORT_TYPE_MIDI_XG
+    MIDI_MT32 = asound.SND_SEQ_PORT_TYPE_MIDI_MT32
+    MIDI_GM2 = asound.SND_SEQ_PORT_TYPE_MIDI_GM2
+    SYNTH = asound.SND_SEQ_PORT_TYPE_SYNTH
+    DIRECT_SAMPLE = asound.SND_SEQ_PORT_TYPE_DIRECT_SAMPLE
+    SAMPLE = asound.SND_SEQ_PORT_TYPE_SAMPLE
+    HARDWARE = asound.SND_SEQ_PORT_TYPE_HARDWARE
+    SOFTWARE = asound.SND_SEQ_PORT_TYPE_SOFTWARE
+    SYNTHESIZER = asound.SND_SEQ_PORT_TYPE_SYNTHESIZER
+    PORT = asound.SND_SEQ_PORT_TYPE_PORT
+    APPLICATION = asound.SND_SEQ_PORT_TYPE_APPLICATION
+
+
+READ_PORT = SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
+WRITE_PORT = SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
 RW_PORT = READ_PORT | WRITE_PORT
+
+DEFAULT_PORT_TYPE = SequencerPortType.MIDI_GENERIC | SequencerPortType.SOFTWARE
 
 
 class SequencerPort:
@@ -79,4 +112,5 @@ class SequencerPort:
 
 SequencerAddress.register(SequencerPort)
 
-__all__ = ["SequencerPort", "READ_PORT", "WRITE_PORT", "RW_PORT"]
+__all__ = ["SequencerPortCaps", "SequencerPortType", "SequencerPort",
+           "READ_PORT", "WRITE_PORT", "RW_PORT", "DEFAULT_PORT_TYPE"]

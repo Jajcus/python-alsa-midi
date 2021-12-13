@@ -6,7 +6,8 @@ from .client import SequencerClient
 from .event import (SequencerEvent, SequencerEventType, SequencerNoteEventBase,
                     SequencerNoteOffEvent, SequencerNoteOnEvent)
 from .exceptions import SequencerALSAError, SequencerError, SequencerStateError
-from .port import READ_PORT, RW_PORT, WRITE_PORT, SequencerPort
+from .port import (READ_PORT, RW_PORT, WRITE_PORT, SequencerPort,
+                   SequencerPortCaps, SequencerPortType)
 from .queue import SequencerQueue
 
 __all__ = [
@@ -15,6 +16,7 @@ __all__ = [
         "SequencerEventType", "SequencerEvent", "SequencerNoteEventBase", "SequencerNoteOnEvent",
         "SequencerNoteOffEvent",
         "SequencerError", "SequencerStateError", "SequencerALSAError",
-        "SequencerPort", "READ_PORT", "WRITE_PORT", "RW_PORT",
+        "SequencerPort", "SequencerPortCaps", "SequencerPortType",
+        "READ_PORT", "WRITE_PORT", "RW_PORT",
         "SequencerQueue",
         ]

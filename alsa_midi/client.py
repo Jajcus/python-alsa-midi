@@ -1,15 +1,27 @@
 
+from enum import IntFlag
 from typing import NewType, Tuple, Union
 
 from ._ffi import asound, ffi
 from .address import SequencerAddress
 from .event import SequencerEvent
 from .exceptions import SequencerStateError
-from .port import RW_PORT, SequencerPort
+from .port import (DEFAULT_PORT_TYPE, RW_PORT, SequencerPort,
+                   SequencerPortCaps, SequencerPortType)
 from .queue import SequencerQueue
 from .util import _check_alsa_error
 
 _snd_seq_t_p = NewType("_snd_seq_t_p", Tuple[object])
+
+
+class SequencerStreamOpenTypes(IntFlag):
+    OUTPUT = asound.SND_SEQ_OPEN_OUTPUT
+    INPUT = asound.SND_SEQ_OPEN_INPUT
+    DUPLEX = asound.SND_SEQ_OPEN_DUPLEX
+
+
+class SequencerOpenMode(IntFlag):
+    NONBLOCK = asound.SND_SEQ_NONBLOCK
 
 
 class SequencerClient:
@@ -19,8 +31,8 @@ class SequencerClient:
     def __init__(
             self,
             client_name: str,
-            streams: int = asound.SND_SEQ_OPEN_DUPLEX,
-            mode: int = asound.SND_SEQ_NONBLOCK,
+            streams: int = SequencerStreamOpenTypes.DUPLEX,
+            mode: int = SequencerOpenMode.NONBLOCK,
             sequencer_name: str = "default"):
 
         client_name_b = client_name.encode("utf-8")
@@ -46,8 +58,8 @@ class SequencerClient:
 
     def create_port(self,
                     name: str,
-                    caps: int = RW_PORT,
-                    port_type: int = asound.SND_SEQ_PORT_TYPE_MIDI_GENERIC
+                    caps: SequencerPortCaps = RW_PORT,
+                    port_type: SequencerPortType = DEFAULT_PORT_TYPE,
                     ) -> SequencerPort:
         self._check_handle()
         port = asound.snd_seq_create_simple_port(self.handle[0],
