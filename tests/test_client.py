@@ -58,12 +58,14 @@ def test_client_open_del_alsa(alsa_seq_state):
     assert client_id not in alsa_seq_state.clients
 
 
+@pytest.mark.require_alsa_seq
 def test_client_drain_output_nothing():
     client = SequencerClient("test")
     client.drain_output()
     client.close()
 
 
+@pytest.mark.require_alsa_seq
 def test_client_drop_output_nothing():
     client = SequencerClient("test")
     client.drop_output()
