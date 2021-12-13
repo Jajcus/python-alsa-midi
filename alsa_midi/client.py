@@ -6,8 +6,7 @@ from ._ffi import asound, ffi
 from .address import SequencerAddress
 from .event import SequencerEvent
 from .exceptions import SequencerStateError
-from .port import (DEFAULT_PORT_TYPE, RW_PORT, SequencerPort,
-                   SequencerPortCaps, SequencerPortType)
+from .port import DEFAULT_PORT_TYPE, RW_PORT, SequencerPort, SequencerPortCaps, SequencerPortType
 from .queue import SequencerQueue
 from .util import _check_alsa_error
 

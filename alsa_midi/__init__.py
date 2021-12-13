@@ -1,13 +1,12 @@
 """Python interface to ALSA MIDI Sequencer."""
 
-from .address import (ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER,
-                      SequencerAddress)
+from .address import ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER, SequencerAddress
 from .client import SequencerClient
 from .event import (SequencerEvent, SequencerEventType, SequencerNoteEventBase,
                     SequencerNoteOffEvent, SequencerNoteOnEvent)
 from .exceptions import SequencerALSAError, SequencerError, SequencerStateError
-from .port import (READ_PORT, RW_PORT, WRITE_PORT, SequencerPort,
-                   SequencerPortCaps, SequencerPortType)
+from .port import (READ_PORT, RW_PORT, WRITE_PORT, SequencerPort, SequencerPortCaps,
+                   SequencerPortType)
 from .queue import SequencerQueue
 
 __all__ = [
