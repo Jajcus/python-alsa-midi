@@ -8,7 +8,7 @@ from .exceptions import SequencerError, SequencerStateError
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
-    from .client import SequencerClient, _snd_seq_t_p
+    from .client import SequencerClient, _snd_seq_t
 
 
 class SequencerPortCaps(IntFlag):
@@ -59,7 +59,7 @@ class SequencerPort:
         except SequencerError:
             pass
 
-    def _get_client_handle(self) -> '_snd_seq_t_p':
+    def _get_client_handle(self) -> '_snd_seq_t':
         if self.client is None:
             raise SequencerStateError("Already closed")
         handle = self.client.handle
@@ -72,33 +72,33 @@ class SequencerPort:
             return
         handle = self.client.handle
         port_id = self.port_id
-        self._client = None
+        self.client = None
         if handle:
-            err = asound.snd_seq_delete_simple_port(handle[0], port_id)
+            err = asound.snd_seq_delete_simple_port(handle, port_id)
             _check_alsa_error(err)
 
     def connect_to(self, dest: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = dest
         handle = self._get_client_handle()
-        err = asound.snd_seq_connect_to(handle[0], self.port_id, client_id, port_id)
+        err = asound.snd_seq_connect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def disconnect_to(self, dest: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = dest
         handle = self._get_client_handle()
-        err = asound.snd_seq_disconnect_to(handle[0], self.port_id, client_id, port_id)
+        err = asound.snd_seq_disconnect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def connect_from(self, src: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = src
         handle = self._get_client_handle()
-        err = asound.snd_seq_connect_from(handle[0], self.port_id, client_id, port_id)
+        err = asound.snd_seq_connect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def disconnect_from(self, src: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = src
         handle = self._get_client_handle()
-        err = asound.snd_seq_disconnect_from(handle[0], self.port_id, client_id, port_id)
+        err = asound.snd_seq_disconnect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     # SequencerAddress interface – it is tuple-like
