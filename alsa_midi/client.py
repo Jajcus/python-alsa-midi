@@ -55,7 +55,8 @@ class SequencerClient:
     def close(self):
         if self._handle_p is None:
             return
-        asound.snd_seq_close(self._handle_p[0])
+        if self._handle_p[0] != ffi.NULL:
+            asound.snd_seq_close(self._handle_p[0])
         self._handle_p = None  # type: ignore
         self.handle = None  # type: ignore
 
