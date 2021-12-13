@@ -1,7 +1,10 @@
 
+import pytest
+
 from alsa_midi import SequencerClient, SequencerPort
 
 
+@pytest.mark.require_alsa_seq
 def test_port_create_close():
     client = SequencerClient("test_c")
     port = client.create_port("test_p")
@@ -17,6 +20,7 @@ def test_port_create_close():
     del port
 
 
+@pytest.mark.require_alsa_seq
 def test_port_create_del():
     client = SequencerClient("test_c")
     port = client.create_port("test_p")
@@ -27,6 +31,7 @@ def test_port_create_del():
     del port
 
 
+@pytest.mark.require_alsa_seq
 def test_port_create_close_alsa(alsa_seq_state):
     client = SequencerClient("test_c")
     port = client.create_port("test_p")
@@ -44,6 +49,7 @@ def test_port_create_close_alsa(alsa_seq_state):
     assert (port.client_id, port.port_id) not in alsa_seq_state.ports
 
 
+@pytest.mark.require_alsa_seq
 def test_port_create_del_alsa(alsa_seq_state):
     client = SequencerClient("test_c")
     port = client.create_port("test_p")

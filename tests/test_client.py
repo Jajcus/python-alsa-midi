@@ -1,9 +1,16 @@
 
 import pytest
 
-from alsa_midi import SequencerClient, SequencerStateError
+from alsa_midi import SequencerALSAError, SequencerClient, SequencerStateError
 
 
+@pytest.mark.require_no_alsa_seq
+def test_client_open_fail():
+    with pytest.raises(SequencerALSAError):
+        SequencerClient("test")
+
+
+@pytest.mark.require_alsa_seq
 def test_client_open_close():
     client = SequencerClient("test")
     assert isinstance(client.client_id, int)
@@ -24,6 +31,7 @@ def test_client_open_close():
     del client
 
 
+@pytest.mark.require_alsa_seq
 def test_client_open_close_alsa(alsa_seq_state):
     client = SequencerClient("test123")
 
@@ -36,6 +44,7 @@ def test_client_open_close_alsa(alsa_seq_state):
     assert client.client_id not in alsa_seq_state.clients
 
 
+@pytest.mark.require_alsa_seq
 def test_client_open_del_alsa(alsa_seq_state):
     client = SequencerClient("test123")
     client_id = client.client_id

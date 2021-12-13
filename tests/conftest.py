@@ -1,4 +1,5 @@
 
+import os
 import re
 from typing import Dict, List, Tuple
 
@@ -119,3 +120,29 @@ class AlsaSequencerState:
 @pytest.fixture
 def alsa_seq_state():
     return AlsaSequencerState()
+
+
+alsa_seq_present = os.path.exists("/proc/asound/seq/clients")
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "require_alsa_seq: mark test to require ALSA sequencer in the kernel"
+    )
+    config.addinivalue_line(
+        "markers", "require_no_alsa_seq: mark test to require ALSA sequencer in the kernel"
+    )
+
+
+@pytest.fixture(autouse=True)
+def skip_if_no_alsa(request):
+    marker = request.node.get_closest_marker("require_alsa_seq")
+    if marker:
+        if not alsa_seq_present:
+            pytest.skip("ALSA sequencer not available in kernel")
+            return
+    marker = request.node.get_closest_marker("require_no_alsa_seq")
+    if marker:
+        if alsa_seq_present:
+            pytest.skip("ALSA sequencer available in kernel, but unwanted by this test")
+            return
