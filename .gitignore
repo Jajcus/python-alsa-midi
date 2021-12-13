@@ -5,3 +5,4 @@ __pycache__
 /python_alsa_midi.egg-info
 /dist
 /build
+/tests/alsa_midi
