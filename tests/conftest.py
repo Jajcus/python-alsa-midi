@@ -123,6 +123,14 @@ def alsa_seq_state():
 
 
 alsa_seq_present = os.path.exists("/proc/asound/seq/clients")
+if not alsa_seq_present:
+    try:
+        # try triggering snd-seq module load
+        with open("/dev/snd/seq", "r"):
+            pass
+        alsa_seq_present = os.path.exists("/proc/asound/seq/clients")
+    except IOError:
+        pass
 
 
 def pytest_configure(config):
