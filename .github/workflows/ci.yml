@@ -87,4 +87,4 @@ jobs:
 
     - name: Run tests in vagrant vm
       run: |
-        vagrant ssh vm -c 'cd /vagranti && PATH="$PATH:$HOME/.local/bin" && tox'
+        vagrant ssh vm -c 'cd /vagrant && PATH="$PATH:$HOME/.local/bin" && tox'
