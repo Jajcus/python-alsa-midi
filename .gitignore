@@ -2,6 +2,7 @@ __pycache__
 *.pyc
 *~
 /.tox
+/.vagrant
 /python_alsa_midi.egg-info
 /dist
 /build

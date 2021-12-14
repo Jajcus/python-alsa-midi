@@ -65,3 +65,26 @@ jobs:
 
     - name: Run tests
       run: "tox -e py"
+
+  test-on-alsa-kernel:
+    runs-on: macos-10.15
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Cache Vagrant boxes
+      uses: actions/cache@v2
+      with:
+        path: ~/.vagrant.d/boxes
+        key: ${{ runner.os }}-vagrant-${{ hashFiles('Vagrantfile') }}
+        restore-keys: |
+          ${{ runner.os }}-vagrant-
+
+    - name: Start vagrant VM
+      run: |
+        cp tests/Vagrantfile .
+        vagrant up
+
+    - name: Run tests in vagrant vm
+      run: |
+        vagrant ssh vm -c 'cd /vagranti && PATH="$PATH:$HOME/.local/bin" && tox'
