@@ -62,6 +62,7 @@ jobs:
         python -m pip install tox
         sudo apt update
         sudo apt install -y libasound2-dev
+        sudo modprobe snd-seq
 
     - name: Run tests
       run: "tox -e py"
