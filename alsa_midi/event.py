@@ -2,71 +2,71 @@
 from enum import IntEnum
 from typing import Any, NewType, Optional, Tuple
 
-from ._ffi import asound, ffi
+from ._ffi import alsa, ffi
 from .address import SequencerAddress
 from .util import _ensure_4bit, _ensure_7bit
 
 
 class SequencerEventType(IntEnum):
-    SYSTEM = asound.SND_SEQ_EVENT_SYSTEM
-    RESULT = asound.SND_SEQ_EVENT_RESULT
-    NOTE = asound.SND_SEQ_EVENT_NOTE
-    NOTEON = asound.SND_SEQ_EVENT_NOTEON
-    NOTEOFF = asound.SND_SEQ_EVENT_NOTEOFF
-    KEYPRESS = asound.SND_SEQ_EVENT_KEYPRESS
-    CONTROLLER = asound.SND_SEQ_EVENT_CONTROLLER
-    PGMCHANGE = asound.SND_SEQ_EVENT_PGMCHANGE
-    CHANPRESS = asound.SND_SEQ_EVENT_CHANPRESS
-    PITCHBEND = asound.SND_SEQ_EVENT_PITCHBEND
-    CONTROL14 = asound.SND_SEQ_EVENT_CONTROL14
-    NONREGPARAM = asound.SND_SEQ_EVENT_NONREGPARAM
-    REGPARAM = asound.SND_SEQ_EVENT_REGPARAM
-    SONGPOS = asound.SND_SEQ_EVENT_SONGPOS
-    SONGSEL = asound.SND_SEQ_EVENT_SONGSEL
-    QFRAME = asound.SND_SEQ_EVENT_QFRAME
-    TIMESIGN = asound.SND_SEQ_EVENT_TIMESIGN
-    KEYSIGN = asound.SND_SEQ_EVENT_KEYSIGN
-    START = asound.SND_SEQ_EVENT_START
-    CONTINUE = asound.SND_SEQ_EVENT_CONTINUE
-    STOP = asound.SND_SEQ_EVENT_STOP
-    SETPOS_TICK = asound.SND_SEQ_EVENT_SETPOS_TICK
-    SETPOS_TIME = asound.SND_SEQ_EVENT_SETPOS_TIME
-    TEMPO = asound.SND_SEQ_EVENT_TEMPO
-    CLOCK = asound.SND_SEQ_EVENT_CLOCK
-    TICK = asound.SND_SEQ_EVENT_TICK
-    QUEUE_SKEW = asound.SND_SEQ_EVENT_QUEUE_SKEW
-    SYNC_POS = asound.SND_SEQ_EVENT_SYNC_POS
-    TUNE_REQUEST = asound.SND_SEQ_EVENT_TUNE_REQUEST
-    RESET = asound.SND_SEQ_EVENT_RESET
-    SENSING = asound.SND_SEQ_EVENT_SENSING
-    ECHO = asound.SND_SEQ_EVENT_ECHO
-    OSS = asound.SND_SEQ_EVENT_OSS
-    CLIENT_START = asound.SND_SEQ_EVENT_CLIENT_START
-    CLIENT_EXIT = asound.SND_SEQ_EVENT_CLIENT_EXIT
-    CLIENT_CHANGE = asound.SND_SEQ_EVENT_CLIENT_CHANGE
-    PORT_START = asound.SND_SEQ_EVENT_PORT_START
-    PORT_EXIT = asound.SND_SEQ_EVENT_PORT_EXIT
-    PORT_CHANGE = asound.SND_SEQ_EVENT_PORT_CHANGE
-    PORT_SUBSCRIBED = asound.SND_SEQ_EVENT_PORT_SUBSCRIBED
-    PORT_UNSUBSCRIBED = asound.SND_SEQ_EVENT_PORT_UNSUBSCRIBED
-    USR0 = asound.SND_SEQ_EVENT_USR0
-    USR1 = asound.SND_SEQ_EVENT_USR1
-    USR2 = asound.SND_SEQ_EVENT_USR2
-    USR3 = asound.SND_SEQ_EVENT_USR3
-    USR4 = asound.SND_SEQ_EVENT_USR4
-    USR5 = asound.SND_SEQ_EVENT_USR5
-    USR6 = asound.SND_SEQ_EVENT_USR6
-    USR7 = asound.SND_SEQ_EVENT_USR7
-    USR8 = asound.SND_SEQ_EVENT_USR8
-    USR9 = asound.SND_SEQ_EVENT_USR9
-    SYSEX = asound.SND_SEQ_EVENT_SYSEX
-    BOUNCE = asound.SND_SEQ_EVENT_BOUNCE
-    USR_VAR0 = asound.SND_SEQ_EVENT_USR_VAR0
-    USR_VAR1 = asound.SND_SEQ_EVENT_USR_VAR1
-    USR_VAR2 = asound.SND_SEQ_EVENT_USR_VAR2
-    USR_VAR3 = asound.SND_SEQ_EVENT_USR_VAR3
-    USR_VAR4 = asound.SND_SEQ_EVENT_USR_VAR4
-    NONE = asound.SND_SEQ_EVENT_NONE
+    SYSTEM = alsa.SND_SEQ_EVENT_SYSTEM
+    RESULT = alsa.SND_SEQ_EVENT_RESULT
+    NOTE = alsa.SND_SEQ_EVENT_NOTE
+    NOTEON = alsa.SND_SEQ_EVENT_NOTEON
+    NOTEOFF = alsa.SND_SEQ_EVENT_NOTEOFF
+    KEYPRESS = alsa.SND_SEQ_EVENT_KEYPRESS
+    CONTROLLER = alsa.SND_SEQ_EVENT_CONTROLLER
+    PGMCHANGE = alsa.SND_SEQ_EVENT_PGMCHANGE
+    CHANPRESS = alsa.SND_SEQ_EVENT_CHANPRESS
+    PITCHBEND = alsa.SND_SEQ_EVENT_PITCHBEND
+    CONTROL14 = alsa.SND_SEQ_EVENT_CONTROL14
+    NONREGPARAM = alsa.SND_SEQ_EVENT_NONREGPARAM
+    REGPARAM = alsa.SND_SEQ_EVENT_REGPARAM
+    SONGPOS = alsa.SND_SEQ_EVENT_SONGPOS
+    SONGSEL = alsa.SND_SEQ_EVENT_SONGSEL
+    QFRAME = alsa.SND_SEQ_EVENT_QFRAME
+    TIMESIGN = alsa.SND_SEQ_EVENT_TIMESIGN
+    KEYSIGN = alsa.SND_SEQ_EVENT_KEYSIGN
+    START = alsa.SND_SEQ_EVENT_START
+    CONTINUE = alsa.SND_SEQ_EVENT_CONTINUE
+    STOP = alsa.SND_SEQ_EVENT_STOP
+    SETPOS_TICK = alsa.SND_SEQ_EVENT_SETPOS_TICK
+    SETPOS_TIME = alsa.SND_SEQ_EVENT_SETPOS_TIME
+    TEMPO = alsa.SND_SEQ_EVENT_TEMPO
+    CLOCK = alsa.SND_SEQ_EVENT_CLOCK
+    TICK = alsa.SND_SEQ_EVENT_TICK
+    QUEUE_SKEW = alsa.SND_SEQ_EVENT_QUEUE_SKEW
+    SYNC_POS = alsa.SND_SEQ_EVENT_SYNC_POS
+    TUNE_REQUEST = alsa.SND_SEQ_EVENT_TUNE_REQUEST
+    RESET = alsa.SND_SEQ_EVENT_RESET
+    SENSING = alsa.SND_SEQ_EVENT_SENSING
+    ECHO = alsa.SND_SEQ_EVENT_ECHO
+    OSS = alsa.SND_SEQ_EVENT_OSS
+    CLIENT_START = alsa.SND_SEQ_EVENT_CLIENT_START
+    CLIENT_EXIT = alsa.SND_SEQ_EVENT_CLIENT_EXIT
+    CLIENT_CHANGE = alsa.SND_SEQ_EVENT_CLIENT_CHANGE
+    PORT_START = alsa.SND_SEQ_EVENT_PORT_START
+    PORT_EXIT = alsa.SND_SEQ_EVENT_PORT_EXIT
+    PORT_CHANGE = alsa.SND_SEQ_EVENT_PORT_CHANGE
+    PORT_SUBSCRIBED = alsa.SND_SEQ_EVENT_PORT_SUBSCRIBED
+    PORT_UNSUBSCRIBED = alsa.SND_SEQ_EVENT_PORT_UNSUBSCRIBED
+    USR0 = alsa.SND_SEQ_EVENT_USR0
+    USR1 = alsa.SND_SEQ_EVENT_USR1
+    USR2 = alsa.SND_SEQ_EVENT_USR2
+    USR3 = alsa.SND_SEQ_EVENT_USR3
+    USR4 = alsa.SND_SEQ_EVENT_USR4
+    USR5 = alsa.SND_SEQ_EVENT_USR5
+    USR6 = alsa.SND_SEQ_EVENT_USR6
+    USR7 = alsa.SND_SEQ_EVENT_USR7
+    USR8 = alsa.SND_SEQ_EVENT_USR8
+    USR9 = alsa.SND_SEQ_EVENT_USR9
+    SYSEX = alsa.SND_SEQ_EVENT_SYSEX
+    BOUNCE = alsa.SND_SEQ_EVENT_BOUNCE
+    USR_VAR0 = alsa.SND_SEQ_EVENT_USR_VAR0
+    USR_VAR1 = alsa.SND_SEQ_EVENT_USR_VAR1
+    USR_VAR2 = alsa.SND_SEQ_EVENT_USR_VAR2
+    USR_VAR3 = alsa.SND_SEQ_EVENT_USR_VAR3
+    USR_VAR4 = alsa.SND_SEQ_EVENT_USR_VAR4
+    NONE = alsa.SND_SEQ_EVENT_NONE
 
     @classmethod
     def _missing_(cls, value):
@@ -134,15 +134,15 @@ class SequencerEvent:
     @classmethod
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
         flags = event.flags
-        if (flags & asound.SND_SEQ_TIME_STAMP_MASK) == asound.SND_SEQ_TIME_STAMP_REAL:
+        if (flags & alsa.SND_SEQ_TIME_STAMP_MASK) == alsa.SND_SEQ_TIME_STAMP_REAL:
             ev_time = event.time.time.tv_sec + 0.000000001 * event.time.tim.tv_nsec
         else:
             ev_time = None
-        if (flags & asound.SND_SEQ_TIME_STAMP_MASK) == asound.SND_SEQ_TIME_STAMP_TICK:
+        if (flags & alsa.SND_SEQ_TIME_STAMP_MASK) == alsa.SND_SEQ_TIME_STAMP_TICK:
             ev_tick = event.time.tick
         else:
             ev_tick = None
-        relative = (flags & asound.SND_SEQ_TIME_MODE_MASK) == asound.SND_SEQ_TIME_MODE_REL
+        relative = (flags & alsa.SND_SEQ_TIME_MODE_MASK) == alsa.SND_SEQ_TIME_MODE_REL
         raw_data = bytes(ffi.buffer(ffi.addressof(event.data)))
         if cls.type is None:
             kwargs["type"] = SequencerEventType(event.type)
@@ -174,13 +174,13 @@ class SequencerEvent:
             nsec = int((self.time - sec) * 1000000000)
             event.time.time.tv_sec = sec
             event.time.time.tv_nsec = nsec
-            flags &= ~(asound.SND_SEQ_TIME_STAMP_MASK | asound.SND_SEQ_TIME_STAMP_REAL)
+            flags &= ~(alsa.SND_SEQ_TIME_STAMP_MASK | alsa.SND_SEQ_TIME_STAMP_REAL)
         if self.tick is not None:
             event.time.tick = self.tick
-            flags &= ~(asound.SND_SEQ_TIME_STAMP_MASK | asound.SND_SEQ_TIME_STAMP_TICK)
+            flags &= ~(alsa.SND_SEQ_TIME_STAMP_MASK | alsa.SND_SEQ_TIME_STAMP_TICK)
         if self.relative is not None:
-            rel = asound.SND_SEQ_TIME_MODE_REL if self.relative else asound.SND_SEQ_TIME_MODE_ABS
-            flags &= ~(asound.SND_SEQ_TIME_MODE_MASK | rel)
+            rel = alsa.SND_SEQ_TIME_MODE_REL if self.relative else alsa.SND_SEQ_TIME_MODE_ABS
+            flags &= ~(alsa.SND_SEQ_TIME_MODE_MASK | rel)
         if self.source is not None:
             event.source.client = self.source.client_id
             event.source.port = self.source.port_id

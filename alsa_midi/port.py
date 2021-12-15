@@ -2,7 +2,7 @@
 from enum import IntFlag
 from typing import TYPE_CHECKING, Tuple, Union
 
-from ._ffi import asound
+from ._ffi import alsa
 from .address import SequencerAddress
 from .exceptions import SequencerError, SequencerStateError
 from .util import _check_alsa_error
@@ -12,32 +12,32 @@ if TYPE_CHECKING:
 
 
 class SequencerPortCaps(IntFlag):
-    READ = asound.SND_SEQ_PORT_CAP_READ
-    WRITE = asound.SND_SEQ_PORT_CAP_WRITE
-    SYNC_READ = asound.SND_SEQ_PORT_CAP_SYNC_READ
-    SYNC_WRITE = asound.SND_SEQ_PORT_CAP_SYNC_WRITE
-    DUPLEX = asound.SND_SEQ_PORT_CAP_DUPLEX
-    SUBS_READ = asound.SND_SEQ_PORT_CAP_SUBS_READ
-    SUBS_WRITE = asound.SND_SEQ_PORT_CAP_SUBS_WRITE
-    NO_EXPORT = asound.SND_SEQ_PORT_CAP_NO_EXPORT
+    READ = alsa.SND_SEQ_PORT_CAP_READ
+    WRITE = alsa.SND_SEQ_PORT_CAP_WRITE
+    SYNC_READ = alsa.SND_SEQ_PORT_CAP_SYNC_READ
+    SYNC_WRITE = alsa.SND_SEQ_PORT_CAP_SYNC_WRITE
+    DUPLEX = alsa.SND_SEQ_PORT_CAP_DUPLEX
+    SUBS_READ = alsa.SND_SEQ_PORT_CAP_SUBS_READ
+    SUBS_WRITE = alsa.SND_SEQ_PORT_CAP_SUBS_WRITE
+    NO_EXPORT = alsa.SND_SEQ_PORT_CAP_NO_EXPORT
 
 
 class SequencerPortType(IntFlag):
-    SPECIFIC = asound.SND_SEQ_PORT_TYPE_SPECIFIC
-    MIDI_GENERIC = asound.SND_SEQ_PORT_TYPE_MIDI_GENERIC
-    MIDI_GM = asound.SND_SEQ_PORT_TYPE_MIDI_GM
-    MIDI_GS = asound.SND_SEQ_PORT_TYPE_MIDI_GS
-    MIDI_XG = asound.SND_SEQ_PORT_TYPE_MIDI_XG
-    MIDI_MT32 = asound.SND_SEQ_PORT_TYPE_MIDI_MT32
-    MIDI_GM2 = asound.SND_SEQ_PORT_TYPE_MIDI_GM2
-    SYNTH = asound.SND_SEQ_PORT_TYPE_SYNTH
-    DIRECT_SAMPLE = asound.SND_SEQ_PORT_TYPE_DIRECT_SAMPLE
-    SAMPLE = asound.SND_SEQ_PORT_TYPE_SAMPLE
-    HARDWARE = asound.SND_SEQ_PORT_TYPE_HARDWARE
-    SOFTWARE = asound.SND_SEQ_PORT_TYPE_SOFTWARE
-    SYNTHESIZER = asound.SND_SEQ_PORT_TYPE_SYNTHESIZER
-    PORT = asound.SND_SEQ_PORT_TYPE_PORT
-    APPLICATION = asound.SND_SEQ_PORT_TYPE_APPLICATION
+    SPECIFIC = alsa.SND_SEQ_PORT_TYPE_SPECIFIC
+    MIDI_GENERIC = alsa.SND_SEQ_PORT_TYPE_MIDI_GENERIC
+    MIDI_GM = alsa.SND_SEQ_PORT_TYPE_MIDI_GM
+    MIDI_GS = alsa.SND_SEQ_PORT_TYPE_MIDI_GS
+    MIDI_XG = alsa.SND_SEQ_PORT_TYPE_MIDI_XG
+    MIDI_MT32 = alsa.SND_SEQ_PORT_TYPE_MIDI_MT32
+    MIDI_GM2 = alsa.SND_SEQ_PORT_TYPE_MIDI_GM2
+    SYNTH = alsa.SND_SEQ_PORT_TYPE_SYNTH
+    DIRECT_SAMPLE = alsa.SND_SEQ_PORT_TYPE_DIRECT_SAMPLE
+    SAMPLE = alsa.SND_SEQ_PORT_TYPE_SAMPLE
+    HARDWARE = alsa.SND_SEQ_PORT_TYPE_HARDWARE
+    SOFTWARE = alsa.SND_SEQ_PORT_TYPE_SOFTWARE
+    SYNTHESIZER = alsa.SND_SEQ_PORT_TYPE_SYNTHESIZER
+    PORT = alsa.SND_SEQ_PORT_TYPE_PORT
+    APPLICATION = alsa.SND_SEQ_PORT_TYPE_APPLICATION
 
 
 READ_PORT = SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
@@ -74,31 +74,31 @@ class SequencerPort:
         port_id = self.port_id
         self.client = None
         if handle:
-            err = asound.snd_seq_delete_simple_port(handle, port_id)
+            err = alsa.snd_seq_delete_simple_port(handle, port_id)
             _check_alsa_error(err)
 
     def connect_to(self, dest: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = dest
         handle = self._get_client_handle()
-        err = asound.snd_seq_connect_to(handle, self.port_id, client_id, port_id)
+        err = alsa.snd_seq_connect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def disconnect_to(self, dest: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = dest
         handle = self._get_client_handle()
-        err = asound.snd_seq_disconnect_to(handle, self.port_id, client_id, port_id)
+        err = alsa.snd_seq_disconnect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def connect_from(self, src: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = src
         handle = self._get_client_handle()
-        err = asound.snd_seq_connect_from(handle, self.port_id, client_id, port_id)
+        err = alsa.snd_seq_connect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def disconnect_from(self, src: Union[SequencerAddress, Tuple[int, int]]):
         client_id, port_id = src
         handle = self._get_client_handle()
-        err = asound.snd_seq_disconnect_from(handle, self.port_id, client_id, port_id)
+        err = alsa.snd_seq_disconnect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     # SequencerAddress interface – it is tuple-like

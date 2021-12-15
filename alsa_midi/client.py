@@ -3,7 +3,7 @@ import errno
 from enum import IntEnum, IntFlag
 from typing import NewType, Optional, Tuple, Union, overload
 
-from ._ffi import asound, ffi
+from ._ffi import alsa, ffi
 from .address import SequencerAddress
 from .event import SequencerEvent
 from .exceptions import SequencerStateError
@@ -16,19 +16,19 @@ _snd_seq_t_p = NewType("_snd_seq_t_p", Tuple[_snd_seq_t])
 
 
 class SequencerStreamOpenTypes(IntFlag):
-    OUTPUT = asound.SND_SEQ_OPEN_OUTPUT
-    INPUT = asound.SND_SEQ_OPEN_INPUT
-    DUPLEX = asound.SND_SEQ_OPEN_DUPLEX
+    OUTPUT = alsa.SND_SEQ_OPEN_OUTPUT
+    INPUT = alsa.SND_SEQ_OPEN_INPUT
+    DUPLEX = alsa.SND_SEQ_OPEN_DUPLEX
 
 
 class SequencerOpenMode(IntFlag):
-    NONBLOCK = asound.SND_SEQ_NONBLOCK
+    NONBLOCK = alsa.SND_SEQ_NONBLOCK
 
 
 class SequencerClientType(IntEnum):
     _UNSET = 0
-    USER = asound.SND_SEQ_USER_CLIENT
-    KERNEL = asound.SND_SEQ_KERNEL_CLIENT
+    USER = alsa.SND_SEQ_USER_CLIENT
+    KERNEL = alsa.SND_SEQ_KERNEL_CLIENT
 
 
 _snd_seq_client_info_t = NewType("_snd_seq_client_info_t", object)
@@ -68,32 +68,32 @@ class SequencerClientInfo:
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_client_info_t):
-        broadcast_filter = asound.snd_seq_client_info_get_broadcast_filter(info)
-        error_bounce = asound.snd_seq_client_info_get_broadcast_filter(info)
-        card_id = asound.snd_seq_client_info_get_card(info)
-        pid = asound.snd_seq_client_info_get_pid(info)
-        name = ffi.string(asound.snd_seq_client_info_get_name(info))
+        broadcast_filter = alsa.snd_seq_client_info_get_broadcast_filter(info)
+        error_bounce = alsa.snd_seq_client_info_get_broadcast_filter(info)
+        card_id = alsa.snd_seq_client_info_get_card(info)
+        pid = alsa.snd_seq_client_info_get_pid(info)
+        name = ffi.string(alsa.snd_seq_client_info_get_name(info))
         return cls(
-                client_id=asound.snd_seq_client_info_get_client(info),
+                client_id=alsa.snd_seq_client_info_get_client(info),
                 name=name.decode(),
                 broadcast_filter=(broadcast_filter == 1),
                 error_bounce=error_bounce == 1,
-                type=SequencerClientType(asound.snd_seq_client_info_get_type(info)),
+                type=SequencerClientType(alsa.snd_seq_client_info_get_type(info)),
                 card_id=(card_id if card_id >= 0 else None),
                 pid=(pid if pid > 0 else None),
-                num_ports=asound.snd_seq_client_info_get_num_ports(info),
-                event_lost=asound.snd_seq_client_info_get_event_lost(info),
+                num_ports=alsa.snd_seq_client_info_get_num_ports(info),
+                event_lost=alsa.snd_seq_client_info_get_event_lost(info),
                 )
 
     def _to_alsa(self) -> _snd_seq_client_info_t:
         info_p: _snd_seq_client_info_t_p = ffi.new("snd_seq_client_info_t **")
-        err = asound.snd_seq_client_info_malloc(info_p)
+        err = alsa.snd_seq_client_info_malloc(info_p)
         _check_alsa_error(err)
         info = info_p[0]
-        asound.snd_seq_client_info_set_client(info, self.client_id)
-        asound.snd_seq_client_info_set_name(info, self.name.encode())
-        asound.snd_seq_client_info_set_broadcast_filter(info, 1 if self.broadcast_filter else 0)
-        asound.snd_seq_client_info_set_error_bounce(info, 1 if self.error_bounce else 0)
+        alsa.snd_seq_client_info_set_client(info, self.client_id)
+        alsa.snd_seq_client_info_set_name(info, self.name.encode())
+        alsa.snd_seq_client_info_set_broadcast_filter(info, 1 if self.broadcast_filter else 0)
+        alsa.snd_seq_client_info_set_error_bounce(info, 1 if self.error_bounce else 0)
         return info
 
 
@@ -112,11 +112,11 @@ class SequencerClient:
         client_name_b = client_name.encode("utf-8")
         sequencer_name_b = sequencer_name.encode("utf-8")
         self._handle_p = ffi.new("snd_seq_t **", ffi.NULL)
-        err = asound.snd_seq_open(self._handle_p, sequencer_name_b, streams, mode)
+        err = alsa.snd_seq_open(self._handle_p, sequencer_name_b, streams, mode)
         _check_alsa_error(err)
         self.handle = self._handle_p[0]
-        asound.snd_seq_set_client_name(self.handle, client_name_b)
-        self.client_id = asound.snd_seq_client_id(self.handle)
+        alsa.snd_seq_set_client_name(self.handle, client_name_b)
+        self.client_id = alsa.snd_seq_client_id(self.handle)
 
     def __del__(self):
         self.close()
@@ -129,7 +129,7 @@ class SequencerClient:
         if self._handle_p is None:
             return
         if self._handle_p[0] != ffi.NULL:
-            asound.snd_seq_close(self._handle_p[0])
+            alsa.snd_seq_close(self._handle_p[0])
         self._handle_p = None  # type: ignore
         self.handle = None  # type: ignore
 
@@ -139,35 +139,35 @@ class SequencerClient:
                     port_type: SequencerPortType = DEFAULT_PORT_TYPE,
                     ) -> SequencerPort:
         self._check_handle()
-        port = asound.snd_seq_create_simple_port(self.handle,
-                                                 name.encode("utf-8"),
-                                                 caps, port_type)
+        port = alsa.snd_seq_create_simple_port(self.handle,
+                                               name.encode("utf-8"),
+                                               caps, port_type)
         _check_alsa_error(port)
         return SequencerPort(self, port)
 
     def create_queue(self, name: str = None) -> SequencerQueue:
         self._check_handle()
         if name is not None:
-            queue = asound.snd_seq_alloc_named_queue(self.handle, name.encode("utf-8"))
+            queue = alsa.snd_seq_alloc_named_queue(self.handle, name.encode("utf-8"))
         else:
-            queue = asound.snd_seq_alloc_queue(self.handle)
+            queue = alsa.snd_seq_alloc_queue(self.handle)
         _check_alsa_error(queue)
         return SequencerQueue(self, queue)
 
     def drain_output(self):
         self._check_handle()
-        err = asound.snd_seq_drain_output(self.handle)
+        err = alsa.snd_seq_drain_output(self.handle)
         _check_alsa_error(err)
 
     def drop_output(self):
         self._check_handle()
-        err = asound.snd_seq_drop_output(self.handle)
+        err = alsa.snd_seq_drop_output(self.handle)
         _check_alsa_error(err)
 
     def event_input(self):
         self._check_handle()
         result = ffi.new("snd_seq_event_t**", ffi.NULL)
-        err = asound.snd_seq_event_input(self.handle, result)
+        err = alsa.snd_seq_event_input(self.handle, result)
         _check_alsa_error(err)
         cls = SequencerEvent._specialized.get(result[0].type, SequencerEvent)
         return cls._from_alsa(result[0])
@@ -185,7 +185,7 @@ class SequencerClient:
             else:
                 alsa_event.queue = queue
         elif event.queue is None:
-            alsa_event.queue = asound.SND_SEQ_QUEUE_DIRECT
+            alsa_event.queue = alsa.SND_SEQ_QUEUE_DIRECT
         if port is not None:
             if isinstance(port, SequencerPort):
                 alsa_event.source.port = port.port_id
@@ -195,8 +195,8 @@ class SequencerClient:
             alsa_event.dest.client = dest.client_id
             alsa_event.dest.port = dest.port_id
         elif event.dest is None:
-            alsa_event.dest.client = asound.SND_SEQ_ADDRESS_SUBSCRIBERS
-        err = asound.snd_seq_event_output(self.handle, alsa_event)
+            alsa_event.dest.client = alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+        err = alsa.snd_seq_event_output(self.handle, alsa_event)
         _check_alsa_error(err)
 
     @overload
@@ -214,18 +214,18 @@ class SequencerClient:
             info = previous._to_alsa()
         else:
             info_p: _snd_seq_client_info_t_p = ffi.new("snd_seq_client_info_t **")
-            err = asound.snd_seq_client_info_malloc(info_p)
+            err = alsa.snd_seq_client_info_malloc(info_p)
             _check_alsa_error(err)
             info = info_p[0]
-            asound.snd_seq_client_info_set_client(info, -1 if previous is None else previous)
+            alsa.snd_seq_client_info_set_client(info, -1 if previous is None else previous)
         try:
-            err = asound.snd_seq_query_next_client(self.handle, info)
+            err = alsa.snd_seq_query_next_client(self.handle, info)
             if err == -errno.ENOENT:
                 return None
             _check_alsa_error(err)
             result = SequencerClientInfo._from_alsa(info)
         finally:
-            asound.snd_seq_client_info_free(info)
+            alsa.snd_seq_client_info_free(info)
         return result
 
 

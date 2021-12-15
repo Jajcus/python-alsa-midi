@@ -2,8 +2,7 @@
 import pytest
 
 from alsa_midi import (SequencerALSAError, SequencerClient, SequencerClientInfo,
-                       SequencerClientType, SequencerStateError)
-from alsa_midi._ffi import asound, ffi
+                       SequencerClientType, SequencerStateError, alsa, ffi)
 
 
 @pytest.mark.require_no_alsa_seq
@@ -123,20 +122,20 @@ def test_client_info():
     assert info.error_bounce is False
 
     alsa_info = info._to_alsa()
-    assert asound.snd_seq_client_info_get_client(alsa_info) == 17
-    assert ffi.string(asound.snd_seq_client_info_get_name(alsa_info)) == b"client_info_test3"
-    assert asound.snd_seq_client_info_get_broadcast_filter(alsa_info) == 1
-    assert asound.snd_seq_client_info_get_error_bounce(alsa_info) == 0
+    assert alsa.snd_seq_client_info_get_client(alsa_info) == 17
+    assert ffi.string(alsa.snd_seq_client_info_get_name(alsa_info)) == b"client_info_test3"
+    assert alsa.snd_seq_client_info_get_broadcast_filter(alsa_info) == 1
+    assert alsa.snd_seq_client_info_get_error_bounce(alsa_info) == 0
 
     # test _from_alsa (only the attributes we can set)
     info_p = ffi.new("snd_seq_client_info_t **")
-    err = asound.snd_seq_client_info_malloc(info_p)
+    err = alsa.snd_seq_client_info_malloc(info_p)
     assert err >= 0
     alsa_info = info_p[0]
-    asound.snd_seq_client_info_set_client(alsa_info, 44)
-    asound.snd_seq_client_info_set_name(alsa_info, b"client_info_test4")
-    asound.snd_seq_client_info_set_broadcast_filter(alsa_info, 1)
-    asound.snd_seq_client_info_set_error_bounce(alsa_info, 1)
+    alsa.snd_seq_client_info_set_client(alsa_info, 44)
+    alsa.snd_seq_client_info_set_name(alsa_info, b"client_info_test4")
+    alsa.snd_seq_client_info_set_broadcast_filter(alsa_info, 1)
+    alsa.snd_seq_client_info_set_error_bounce(alsa_info, 1)
     info = SequencerClientInfo._from_alsa(alsa_info)
 
     assert info.client_id == 44

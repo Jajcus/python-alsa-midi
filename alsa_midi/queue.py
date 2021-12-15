@@ -1,7 +1,7 @@
 
 from typing import TYPE_CHECKING
 
-from ._ffi import asound, ffi
+from ._ffi import alsa, ffi
 from .event import SequencerEventType
 from .exceptions import SequencerError, SequencerStateError
 from .util import _check_alsa_error
@@ -37,25 +37,25 @@ class SequencerQueue:
         self.queue_id = None
         self.client = None
         if handle:
-            err = asound.snd_seq_free_queue(handle, queue)
+            err = alsa.snd_seq_free_queue(handle, queue)
             _check_alsa_error(err)
 
     def set_tempo(self, tempo: int = 500000, ppq: int = 96):
         handle = self._get_client_handle()
         q_tempo = ffi.new("snd_seq_queue_tempo_t **", ffi.NULL)
-        err = asound.snd_seq_queue_tempo_malloc(q_tempo)
+        err = alsa.snd_seq_queue_tempo_malloc(q_tempo)
         _check_alsa_error(err)
         try:
-            asound.snd_seq_queue_tempo_set_tempo(q_tempo[0], tempo)
-            asound.snd_seq_queue_tempo_set_ppq(q_tempo[0], ppq)
-            err = asound.snd_seq_set_queue_tempo(handle, self.queue_id, q_tempo[0])
+            alsa.snd_seq_queue_tempo_set_tempo(q_tempo[0], tempo)
+            alsa.snd_seq_queue_tempo_set_ppq(q_tempo[0], ppq)
+            err = alsa.snd_seq_set_queue_tempo(handle, self.queue_id, q_tempo[0])
             _check_alsa_error(err)
         finally:
-            asound.snd_seq_queue_tempo_free(q_tempo[0])
+            alsa.snd_seq_queue_tempo_free(q_tempo[0])
 
     def control(self, event_type: SequencerEventType, value: int = 0):
         handle = self._get_client_handle()
-        err = asound.snd_seq_control_queue(handle, self.queue_id, event_type, value, ffi.NULL)
+        err = alsa.snd_seq_control_queue(handle, self.queue_id, event_type, value, ffi.NULL)
         _check_alsa_error(err)
 
     def start(self):

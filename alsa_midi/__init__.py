@@ -1,5 +1,6 @@
 """Python interface to ALSA MIDI Sequencer."""
 
+from ._ffi import alsa, ffi
 from .address import ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER, SequencerAddress
 from .client import SequencerClient, SequencerClientInfo, SequencerClientType
 from .event import (SequencerEvent, SequencerEventType, SequencerNoteEventBase,
@@ -18,4 +19,5 @@ __all__ = [
         "SequencerPort", "SequencerPortCaps", "SequencerPortType",
         "READ_PORT", "WRITE_PORT", "RW_PORT",
         "SequencerQueue",
+        "alsa", "ffi",
         ]

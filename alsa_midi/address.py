@@ -3,7 +3,7 @@ from abc import ABCMeta
 from collections import namedtuple
 from typing import TYPE_CHECKING, Tuple, Union, overload
 
-from ._ffi import asound, ffi
+from ._ffi import alsa, ffi
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id"), meta
     @staticmethod
     def _parse(arg: str) -> Tuple[int, int]:
         addr_p = ffi.new("snd_seq_addr_t *")
-        result = asound.snd_seq_parse_address(ffi.NULL, addr_p, arg.encode())
+        result = alsa.snd_seq_parse_address(ffi.NULL, addr_p, arg.encode())
         _check_alsa_error(result)
         return addr_p.client, addr_p.port
 
@@ -58,9 +58,9 @@ class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id"), meta
         return f"{self.client_id}:{self.port_id}"
 
 
-ALL_SUBSCRIBERS = SequencerAddress(asound.SND_SEQ_ADDRESS_SUBSCRIBERS, 0)
-SYSTEM_TIMER = SequencerAddress(asound.SND_SEQ_CLIENT_SYSTEM, asound.SND_SEQ_PORT_SYSTEM_TIMER)
-SYSTEM_ANNOUNCE = SequencerAddress(asound.SND_SEQ_CLIENT_SYSTEM,
-                                   asound.SND_SEQ_PORT_SYSTEM_ANNOUNCE)
+ALL_SUBSCRIBERS = SequencerAddress(alsa.SND_SEQ_ADDRESS_SUBSCRIBERS, 0)
+SYSTEM_TIMER = SequencerAddress(alsa.SND_SEQ_CLIENT_SYSTEM, alsa.SND_SEQ_PORT_SYSTEM_TIMER)
+SYSTEM_ANNOUNCE = SequencerAddress(alsa.SND_SEQ_CLIENT_SYSTEM,
+                                   alsa.SND_SEQ_PORT_SYSTEM_ANNOUNCE)
 
 __all__ = ["SequencerAddress", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE"]

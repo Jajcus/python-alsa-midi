@@ -1,5 +1,5 @@
 
-from ._ffi import asound, ffi
+from ._ffi import alsa, ffi
 from .exceptions import SequencerALSAError
 
 
@@ -7,7 +7,7 @@ def _check_alsa_error(code):
     if not isinstance(code, int):
         raise TypeError("ALSA error code must be an int")
     if code < 0:
-        message = ffi.string(asound.snd_strerror(code))
+        message = ffi.string(alsa.snd_strerror(code))
         raise SequencerALSAError(message.decode(), code)
 
 

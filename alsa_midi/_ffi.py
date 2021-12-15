@@ -5,7 +5,7 @@ from pure Python (API level)
 
 try:
     from ._ffi_bin import ffi
-    asound = ffi.dlopen(None)
+    alsa = ffi.dlopen(None)
 except ImportError:
     from ._ffi_defs import ffi
-    asound = ffi.dlopen("libasound.so.2")
+    alsa = ffi.dlopen("libasound.so.2")
