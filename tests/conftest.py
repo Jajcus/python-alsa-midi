@@ -39,12 +39,14 @@ class AlsaClientState:
     name: str
     type: str
     ports: Dict[int, AlsaPortState]
+    queues: Dict[int, 'AlsaQueueState']
 
     def __init__(self, client_id, name, client_type):
         self.client_id = client_id
         self.name = name
         self.type = client_type
         self.ports = {}
+        self.queues = {}
 
     def __repr__(self):
         return f"<AlsaClientState {self.client_id} {self.name!r}>"
@@ -53,6 +55,71 @@ class AlsaClientState:
         result = f"  Client {self.client_id} {self.name!r} type={self.type!r}\n"
         for port in self.ports.values():
             result += str(port)
+        return result
+
+
+PROC_QUEUE_HEADER_RE = re.compile(r'queue\s+(\d+)\s*:\s*\[([^\]]*)\]')
+PROC_QUEUE_PARAM_RE = re.compile(r'(\w[\w\s]*\w)\s*:\s*(\S+)')
+
+
+class AlsaQueueState:
+    queue_id: int
+    name: str
+    client_id: int
+    lock_status: str
+    queued_time_events: int
+    queued_tick_events: int
+    timer_state: str
+    timer_ppq: int
+    current_tempo: int
+    current_bpm: int
+    current_time: Tuple[int, int]
+    current_tick: int
+
+    def __init__(self, lines):
+        for line in lines:
+            match = PROC_QUEUE_HEADER_RE.match(line)
+            if match:
+                self.queue_id = int(match.group(1))
+                self.name = match.group(2)
+                continue
+            match = PROC_QUEUE_PARAM_RE.match(line)
+            if not match:
+                continue
+            key = match.group(1)
+            value = match.group(2)
+
+            if key == "owned by client":
+                self.client_id = int(value)
+            elif key == "lock status":
+                self.lock_status = value
+            elif key == "queued time events":
+                self.queued_time_events = int(value)
+            elif key == "queued tick events":
+                self.queued_tick_events = int(value)
+            elif key == "timer state":
+                self.timer_state = value
+            elif key == "timer PPQ":
+                self.timetimer_ppq = int(value)
+            elif key == "current tempo":
+                self.current_tempo = int(value)
+            elif key == "current BPM":
+                self.current_bpm = int(value)
+            elif key == "current time":
+                sec, nsec = value.split(".", 1)
+                self.current_time = (int(sec), int(nsec))
+            elif key == "current tick":
+                self.current_tick = int(value)
+
+    def __repr__(self):
+        return f"<AlsaQueueState #{self.queue_id}, owned by {self.client_id}>"
+
+    def __str__(self):
+        result = f"  Queue #{self.queue_id} {self.name!r} owned by {self.client_id}\n"
+        for key, value in self.__dict__.items():
+            if key in ("queue_id", "name", "client_id"):
+                continue
+            result += f"    {key}: {value}\n"
         return result
 
 
@@ -72,20 +139,26 @@ def parse_port_list(string: str) -> List[Tuple[int, int]]:
 class AlsaSequencerState:
     clients: Dict[int, AlsaClientState]
     ports: Dict[Tuple[int, int], AlsaPortState]
+    queues: Dict[int, AlsaQueueState]
 
     def __init__(self):
         self.clients = {}
         self.ports = {}
+        self.queues = {}
 
     def __str__(self):
         result = "ALSA Sequencer State:\n"
         for client in self.clients.values():
             result += str(client) + "\n"
+        for queue in self.queues.values():
+            result += str(queue) + "\n"
         return result
 
     def load(self):
         self.clients = {}
         self.ports = {}
+        self.queues = {}
+
         with open("/proc/asound/seq/clients", "r") as proc_f:
             client = None
             port = None
@@ -115,6 +188,25 @@ class AlsaSequencerState:
                 if match:
                     port.connected_from = parse_port_list(match.group(1))
                     continue
+
+        with open("/proc/asound/seq/queues", "r") as proc_f:
+            queues = []
+            queue_lines = []
+            for line in proc_f:
+                if not line.strip():
+                    if queue_lines:
+                        queues.append(AlsaQueueState(queue_lines))
+                        queue_lines = []
+                else:
+                    queue_lines.append(line)
+            if queue_lines:
+                queues.append(AlsaQueueState(queue_lines))
+            for queue in queues:
+                self.queues[queue.queue_id] = queue
+                try:
+                    self.clients[queue.client_id].queues[queue.queue_id] = queue
+                except KeyError:
+                    pass
 
 
 @pytest.fixture
