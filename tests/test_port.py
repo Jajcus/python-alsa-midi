@@ -1,7 +1,9 @@
 
+from typing import Any
+
 import pytest
 
-from alsa_midi import SequencerClient, SequencerPort
+from alsa_midi import SequencerAddress, SequencerClient, SequencerPort
 
 
 @pytest.mark.require_alsa_seq
@@ -67,3 +69,21 @@ def test_port_create_del_alsa(alsa_seq_state):
 
     alsa_seq_state.load()
     assert (client_id, port_id) not in alsa_seq_state.ports
+
+
+def test_port_as_address():
+    class ClientMock:
+        def __init__(self, client_id):
+            self.client_id = client_id
+            self.handle = None
+
+    client: Any = ClientMock(129)
+    port = SequencerPort(client, 3)
+
+    assert port.client_id == 129
+    assert port.port_id == 3
+    assert isinstance(port, SequencerAddress)
+    assert SequencerAddress(port) == SequencerAddress(129, 3)
+    assert tuple(port) == (129, 3)
+    assert port == SequencerAddress(129, 3)
+    assert SequencerAddress(129, 3) == port

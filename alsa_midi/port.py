@@ -109,6 +109,15 @@ class SequencerPort:
     def __getitem__(self, index):
         return (self.client_id, self.port_id)[index]
 
+    def __eq__(self, other):
+        if self is other:
+            return True
+
+        # no isinstance() here, as two different SequencerPort object are not equal,
+        # even if they have the same address
+        if other.__class__ is SequencerAddress:
+            return (self.client_id, self.port_id) == other
+
 
 SequencerAddress.register(SequencerPort)
 
