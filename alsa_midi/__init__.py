@@ -1,7 +1,7 @@
 """Python interface to ALSA MIDI Sequencer."""
 
 from .address import ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER, SequencerAddress
-from .client import SequencerClient
+from .client import SequencerClient, SequencerClientInfo, SequencerClientType
 from .event import (SequencerEvent, SequencerEventType, SequencerNoteEventBase,
                     SequencerNoteOffEvent, SequencerNoteOnEvent)
 from .exceptions import SequencerALSAError, SequencerError, SequencerStateError
@@ -11,7 +11,7 @@ from .queue import SequencerQueue
 
 __all__ = [
         "SequencerAddress", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE",
-        "SequencerClient",
+        "SequencerClient", "SequencerClientInfo", "SequencerClientType",
         "SequencerEventType", "SequencerEvent", "SequencerNoteEventBase", "SequencerNoteOnEvent",
         "SequencerNoteOffEvent",
         "SequencerError", "SequencerStateError", "SequencerALSAError",
