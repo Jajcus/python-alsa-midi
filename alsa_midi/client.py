@@ -108,7 +108,7 @@ class SequencerClient:
         alsa_event = event._to_alsa()
         if queue is not None:
             if isinstance(queue, SequencerQueue):
-                alsa_event.queue = queue.queue
+                alsa_event.queue = queue.queue_id
             else:
                 alsa_event.queue = queue
         elif event.queue is None:
