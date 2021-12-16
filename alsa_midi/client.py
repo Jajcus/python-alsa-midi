@@ -1,7 +1,7 @@
 
 import errno
 from enum import IntEnum, IntFlag
-from typing import NewType, Optional, Tuple, Union, overload
+from typing import NewType, Optional, Tuple, Union, overload, List
 
 from ._ffi import alsa, ffi
 from .address import SequencerAddress
@@ -263,6 +263,98 @@ class SequencerClient:
             result = SequencerPortInfo._from_alsa(info)
         finally:
             alsa.snd_seq_port_info_free(info)
+        return result
+
+    def list_ports(self, *,
+                   input: bool = None,
+                   output: bool = None,
+                   include_system: bool = False,
+                   include_midi_through: bool = True,
+                   include_no_export: bool = True,
+                   only_connectable: bool = True
+                   ) -> List[SequencerPortInfo]:
+
+        result = []
+        self._check_handle()
+
+        client_ainfo = None
+        port_ainfo = None
+
+        try:
+            client_ainfo_p: _snd_seq_client_info_t_p = ffi.new("snd_seq_client_info_t **")
+            err = alsa.snd_seq_client_info_malloc(client_ainfo_p)
+            _check_alsa_error(err)
+            client_ainfo = client_ainfo_p[0]
+            port_ainfo_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+            err = alsa.snd_seq_port_info_malloc(port_ainfo_p)
+            _check_alsa_error(err)
+            port_ainfo = port_ainfo_p[0]
+
+            alsa.snd_seq_client_info_set_client(client_ainfo, -1)
+            while True:
+                err = alsa.snd_seq_query_next_client(self.handle, client_ainfo)
+                if err == -errno.ENOENT:
+                    break
+                _check_alsa_error(err)
+
+                client_id = alsa.snd_seq_client_info_get_client(client_ainfo)
+                if client_id == 0 and not include_system:
+                    continue
+
+                client_name = alsa.snd_seq_client_info_get_name(client_ainfo)
+                client_name = ffi.string(client_name).decode()
+
+                if client_name == "Midi Through" and not include_midi_through:
+                    continue
+
+                alsa.snd_seq_port_info_set_client(port_ainfo, client_id)
+                alsa.snd_seq_port_info_set_port(port_ainfo, -1)
+                while True:
+                    err = alsa.snd_seq_query_next_port(self.handle, port_ainfo)
+                    if err == -errno.ENOENT:
+                        break
+                    _check_alsa_error(err)
+
+                    port_info = SequencerPortInfo._from_alsa(port_ainfo)
+
+                    if port_info.capability & SequencerPortCaps.NO_EXPORT and include_no_export:
+                        continue
+
+                    can_write = port_info.capability & SequencerPortCaps.WRITE
+                    can_sub_write = port_info.capability & SequencerPortCaps.SUBS_WRITE
+                    can_read = port_info.capability & SequencerPortCaps.READ
+                    can_sub_read = port_info.capability & SequencerPortCaps.SUBS_READ
+
+                    if output:
+                        if not can_write:
+                            continue
+                        if only_connectable and not can_sub_write:
+                            continue
+
+                    if input:
+                        if not can_read:
+                            continue
+                        if only_connectable and not can_sub_read:
+                            continue
+
+                    if not input and not output:
+                        if only_connectable:
+                            if can_read and can_sub_read:
+                                pass
+                            elif can_write and can_sub_write:
+                                pass
+                            else:
+                                continue
+                        elif not can_read and not can_write:
+                            continue
+
+                    port_info.client_name = client_name
+                    result.append(port_info)
+        finally:
+            if client_ainfo is not None:
+                alsa.snd_seq_client_info_free(client_ainfo)
+            if port_ainfo is not None:
+                alsa.snd_seq_port_info_free(port_ainfo)
         return result
 
 

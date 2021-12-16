@@ -1,6 +1,6 @@
 
 from enum import IntFlag
-from typing import TYPE_CHECKING, NewType, Tuple, Union
+from typing import TYPE_CHECKING, NewType, Tuple, Union, Optional
 
 from ._ffi import alsa, ffi
 from .address import SequencerAddress
@@ -144,6 +144,8 @@ class SequencerPortInfo:
     timestamp_real: bool
     timestamp_queue_id: int
 
+    client_name: Optional[str]
+
     def __init__(self,
                  client_id: int,
                  port_id: int = None,
@@ -159,6 +161,7 @@ class SequencerPortInfo:
                  timestamping: bool = False,
                  timestamp_real: bool = False,
                  timestamp_queue_id: int = 0):
+
         self.client_id = client_id
         if port_id is not None:
             self.port_id = port_id
@@ -183,6 +186,7 @@ class SequencerPortInfo:
         self.timestamping = timestamping
         self.timestamp_real = timestamp_real
         self.timestamp_queue_id = timestamp_queue_id
+        self.client_name = None
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_port_info_t):
