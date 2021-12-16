@@ -9,6 +9,7 @@ def main():
     client_info = client.query_next_client()
     while client_info:
         print(f"Client {client_info.client_id}: {client_info.name!r}")
+        assert client_info.type is not None
         print(f"  type             : {client_info.type.name}")
         if client_info.card_id is not None:
             print(f"  card             : {client_info.card_id}")
