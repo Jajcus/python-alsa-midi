@@ -3,7 +3,8 @@ from typing import Any
 
 import pytest
 
-from alsa_midi import SequencerAddress, SequencerClient, SequencerPort
+from alsa_midi import (SequencerAddress, SequencerClient, SequencerPort, SequencerPortCaps,
+                       SequencerPortInfo, SequencerPortType, alsa, ffi)
 
 
 @pytest.mark.require_alsa_seq
@@ -87,3 +88,154 @@ def test_port_as_address():
     assert tuple(port) == (129, 3)
     assert port == SequencerAddress(129, 3)
     assert SequencerAddress(129, 3) == port
+
+
+def test_port_info():
+
+    # test defaults
+    info = SequencerPortInfo(client_id=11)
+
+    assert info.client_id == 11
+    assert info.port_id == 0
+    assert info.name == ""
+    assert info.capability == SequencerPortCaps._NONE
+    assert info.type == SequencerPortType._NONE
+    assert info.midi_channels == 0
+    assert info.midi_voices == 0
+    assert info.synth_voices == 0
+    assert info.read_use == 0
+    assert info.write_use == 0
+    assert info.port_specified is False
+    assert info.timestamping is False
+    assert info.timestamp_real is False
+    assert info.timestamp_queue_id == 0
+
+    # test initializing all attributes
+    info = SequencerPortInfo(client_id=15,
+                             port_id=17,
+                             name="port_info_test2",
+                             capability=SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+                             type=SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER,
+                             midi_channels=1,
+                             midi_voices=2,
+                             synth_voices=3,
+                             read_use=4,
+                             write_use=5,
+                             timestamping=True,
+                             timestamp_real=True,
+                             timestamp_queue_id=6)
+
+    assert info.client_id == 15
+    assert info.port_id == 17
+    assert info.name == "port_info_test2"
+    assert info.capability == SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
+    assert info.type == SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER
+    assert info.midi_channels == 1
+    assert info.midi_voices == 2
+    assert info.synth_voices == 3
+    assert info.read_use == 4
+    assert info.write_use == 5
+    assert info.port_specified is True
+    assert info.timestamping is True
+    assert info.timestamp_real is True
+    assert info.timestamp_queue_id == 6
+
+    # test _to_alsa (only some values are writable to the ALSA struct)
+    alsa_info = info._to_alsa()
+
+    assert alsa.snd_seq_port_info_get_client(alsa_info) == 15
+    assert alsa.snd_seq_port_info_get_port(alsa_info) == 17
+    assert ffi.string(alsa.snd_seq_port_info_get_name(alsa_info)) == b"port_info_test2"
+    assert alsa.snd_seq_port_info_get_capability(alsa_info) == (
+            alsa.SND_SEQ_PORT_CAP_WRITE | alsa.SND_SEQ_PORT_CAP_SUBS_WRITE)
+    assert alsa.snd_seq_port_info_get_type(alsa_info) == (
+            alsa.SND_SEQ_PORT_TYPE_MIDI_GENERIC | alsa.SND_SEQ_PORT_TYPE_SYNTHESIZER)
+    assert alsa.snd_seq_port_info_get_midi_channels(alsa_info) == 1
+    assert alsa.snd_seq_port_info_get_midi_voices(alsa_info) == 2
+    assert alsa.snd_seq_port_info_get_synth_voices(alsa_info) == 3
+    assert alsa.snd_seq_port_info_get_port_specified(alsa_info) == 1
+    assert alsa.snd_seq_port_info_get_timestamping(alsa_info) == 1
+    assert alsa.snd_seq_port_info_get_timestamp_real(alsa_info) == 1
+    assert alsa.snd_seq_port_info_get_timestamp_queue(alsa_info) == 6
+
+    # test _from_alsa (only the attributes we can set)
+    info_p = ffi.new("snd_seq_port_info_t **")
+    err = alsa.snd_seq_port_info_malloc(info_p)
+    assert err >= 0
+    alsa_info = info_p[0]
+
+    alsa.snd_seq_port_info_set_client(alsa_info, 115)
+    alsa.snd_seq_port_info_set_port(alsa_info, 117)
+    alsa.snd_seq_port_info_set_name(alsa_info, b"port_info_test3")
+    alsa.snd_seq_port_info_set_capability(
+            alsa_info,
+            alsa.SND_SEQ_PORT_CAP_WRITE | alsa.SND_SEQ_PORT_CAP_SUBS_WRITE)
+    alsa.snd_seq_port_info_set_type(
+            alsa_info,
+            alsa.SND_SEQ_PORT_TYPE_MIDI_GENERIC | alsa.SND_SEQ_PORT_TYPE_SYNTHESIZER)
+    alsa.snd_seq_port_info_set_midi_channels(alsa_info, 11)
+    alsa.snd_seq_port_info_set_midi_voices(alsa_info, 12)
+    alsa.snd_seq_port_info_set_synth_voices(alsa_info, 13)
+    alsa.snd_seq_port_info_set_port_specified(alsa_info, 1)
+    alsa.snd_seq_port_info_set_timestamping(alsa_info, 1)
+    alsa.snd_seq_port_info_set_timestamp_real(alsa_info, 1)
+    alsa.snd_seq_port_info_set_timestamp_queue(alsa_info, 16)
+
+    info = SequencerPortInfo._from_alsa(alsa_info)
+
+    assert info.client_id == 115
+    assert info.port_id == 117
+    assert info.name == "port_info_test3"
+    assert info.capability == SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
+    assert info.type == SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER
+    assert info.midi_channels == 11
+    assert info.midi_voices == 12
+    assert info.synth_voices == 13
+    assert info.port_specified is True
+    assert info.timestamping is True
+    assert info.timestamp_real is True
+    assert info.timestamp_queue_id == 16
+
+
+@pytest.mark.require_alsa_seq
+def test_query_next_port(alsa_seq_state):
+    client = SequencerClient("test")
+    alsa_seq_state.load()
+
+    # let's test it on the 'System' ports. They should always be there.
+    client_id = 0
+
+    first_port_id = min(port_id for port_id in alsa_seq_state.clients[client_id].ports)
+    last_port_id = max(port_id for port_id in alsa_seq_state.clients[client_id].ports)
+
+    all_infos = []
+
+    info = client.query_next_port(client_id)
+    assert info is not None
+    assert info.port_id == first_port_id
+
+    port_id = -1
+
+    while info is not None:
+        all_infos.append(info)
+        port_id = info.port_id
+        alsa_port = alsa_seq_state.clients[client_id].ports[port_id]
+
+        assert info.client_id == alsa_port.client_id
+        assert info.name == alsa_port.name
+
+        assert (SequencerPortCaps.WRITE in info.capability) == ("w" in alsa_port.flags.lower())
+        assert (SequencerPortCaps.SUBS_WRITE in info.capability) == ("W" in alsa_port.flags)
+        assert (SequencerPortCaps.READ in info.capability) == ("r" in alsa_port.flags.lower())
+        assert (SequencerPortCaps.SUBS_READ in info.capability) == ("R" in alsa_port.flags)
+
+        assert info.read_use == len(alsa_port.connected_to)
+        assert info.write_use == len(alsa_port.connected_from)
+
+        info = client.query_next_port(client_id, info)
+
+    assert port_id == last_port_id
+
+    assert len(all_infos) == len(alsa_seq_state.clients[client_id].ports)
+
+    client.close()

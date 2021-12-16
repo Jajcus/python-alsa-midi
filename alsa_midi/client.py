@@ -7,7 +7,8 @@ from ._ffi import alsa, ffi
 from .address import SequencerAddress
 from .event import SequencerEvent
 from .exceptions import SequencerStateError
-from .port import DEFAULT_PORT_TYPE, RW_PORT, SequencerPort, SequencerPortCaps, SequencerPortType
+from .port import (DEFAULT_PORT_TYPE, RW_PORT, SequencerPort, SequencerPortCaps, SequencerPortInfo,
+                   SequencerPortType, _snd_seq_port_info_t_p)
 from .queue import SequencerQueue
 from .util import _check_alsa_error
 
@@ -226,6 +227,42 @@ class SequencerClient:
             result = SequencerClientInfo._from_alsa(info)
         finally:
             alsa.snd_seq_client_info_free(info)
+        return result
+
+    @overload
+    def query_next_port(self, client_id: int, previous: SequencerPortInfo
+                        ) -> Optional[SequencerPortInfo]:
+        ...
+
+    @overload
+    def query_next_port(self, client_id: int, previous: Optional[int] = None
+                        ) -> Optional[SequencerPortInfo]:
+        ...
+
+    def query_next_port(self,
+                        client_id: int,
+                        previous: Optional[Union[SequencerPortInfo, int]] = None
+                        ) -> Optional[SequencerPortInfo]:
+        self._check_handle()
+        if isinstance(previous, SequencerPortInfo):
+            if not previous.client_id == client_id:
+                raise ValueError("client_id mismatch")
+            info = previous._to_alsa()
+        else:
+            info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+            err = alsa.snd_seq_port_info_malloc(info_p)
+            _check_alsa_error(err)
+            info = info_p[0]
+            alsa.snd_seq_port_info_set_client(info, client_id)
+            alsa.snd_seq_port_info_set_port(info, -1 if previous is None else previous)
+        try:
+            err = alsa.snd_seq_query_next_port(self.handle, info)
+            if err == -errno.ENOENT:
+                return None
+            _check_alsa_error(err)
+            result = SequencerPortInfo._from_alsa(info)
+        finally:
+            alsa.snd_seq_port_info_free(info)
         return result
 
 

@@ -1,8 +1,8 @@
 
 from enum import IntFlag
-from typing import TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING, NewType, Tuple, Union
 
-from ._ffi import alsa
+from ._ffi import alsa, ffi
 from .address import SequencerAddress
 from .exceptions import SequencerError, SequencerStateError
 from .util import _check_alsa_error
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 
 class SequencerPortCaps(IntFlag):
+    _NONE = 0
     READ = alsa.SND_SEQ_PORT_CAP_READ
     WRITE = alsa.SND_SEQ_PORT_CAP_WRITE
     SYNC_READ = alsa.SND_SEQ_PORT_CAP_SYNC_READ
@@ -23,6 +24,7 @@ class SequencerPortCaps(IntFlag):
 
 
 class SequencerPortType(IntFlag):
+    _NONE = 0
     SPECIFIC = alsa.SND_SEQ_PORT_TYPE_SPECIFIC
     MIDI_GENERIC = alsa.SND_SEQ_PORT_TYPE_MIDI_GENERIC
     MIDI_GM = alsa.SND_SEQ_PORT_TYPE_MIDI_GM
@@ -121,5 +123,129 @@ class SequencerPort:
 
 SequencerAddress.register(SequencerPort)
 
+
+_snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)
+_snd_seq_port_info_t_p = NewType("_snd_seq_port_info_t", Tuple[_snd_seq_port_info_t])
+
+
+class SequencerPortInfo:
+    client_id: int
+    port_id: int
+    name: str
+    capability: SequencerPortCaps
+    type: SequencerPortType
+    midi_channels: int
+    midi_voices: int
+    synth_voices: int
+    read_use: int
+    write_use: int
+    port_specified: bool
+    timestamping: bool
+    timestamp_real: bool
+    timestamp_queue_id: int
+
+    def __init__(self,
+                 client_id: int,
+                 port_id: int = None,
+                 name: str = None,
+                 capability: SequencerPortCaps = SequencerPortCaps._NONE,
+                 type: SequencerPortType = SequencerPortType._NONE,
+                 midi_channels: int = 0,
+                 midi_voices: int = 0,
+                 synth_voices: int = 0,
+                 read_use: int = 0,
+                 write_use: int = 0,
+                 port_specified: bool = None,
+                 timestamping: bool = False,
+                 timestamp_real: bool = False,
+                 timestamp_queue_id: int = 0):
+        self.client_id = client_id
+        if port_id is not None:
+            self.port_id = port_id
+            if port_specified is None:
+                port_specified = True
+        else:
+            self.port_id = 0
+            if port_specified is None:
+                port_specified = False
+        if name:
+            self.name = name
+        else:
+            self.name = ""
+        self.capability = capability
+        self.type = type
+        self.midi_channels = midi_channels
+        self.midi_voices = midi_voices
+        self.synth_voices = synth_voices
+        self.read_use = read_use
+        self.write_use = write_use
+        self.port_specified = port_specified
+        self.timestamping = timestamping
+        self.timestamp_real = timestamp_real
+        self.timestamp_queue_id = timestamp_queue_id
+
+    @classmethod
+    def _from_alsa(cls, info: _snd_seq_port_info_t):
+        name = ffi.string(alsa.snd_seq_port_info_get_name(info))
+        caps = alsa.snd_seq_port_info_get_capability(info)
+        p_type = alsa.snd_seq_port_info_get_type(info)
+        return cls(
+                client_id=alsa.snd_seq_port_info_get_client(info),
+                port_id=alsa.snd_seq_port_info_get_port(info),
+                name=name.decode(),
+                capability=SequencerPortCaps(caps),
+                type=SequencerPortType(p_type),
+                midi_channels=alsa.snd_seq_port_info_get_midi_channels(info),
+                midi_voices=alsa.snd_seq_port_info_get_midi_voices(info),
+                synth_voices=alsa.snd_seq_port_info_get_synth_voices(info),
+                read_use=alsa.snd_seq_port_info_get_read_use(info),
+                write_use=alsa.snd_seq_port_info_get_write_use(info),
+                port_specified=(alsa.snd_seq_port_info_get_port_specified(info) == 1),
+                timestamping=(alsa.snd_seq_port_info_get_timestamping(info) == 1),
+                timestamp_real=(alsa.snd_seq_port_info_get_timestamp_real(info) == 1),
+                timestamp_queue_id=alsa.snd_seq_port_info_get_timestamp_queue(info),
+                )
+
+    def _to_alsa(self) -> _snd_seq_port_info_t:
+        info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+        err = alsa.snd_seq_port_info_malloc(info_p)
+        _check_alsa_error(err)
+        info = info_p[0]
+        alsa.snd_seq_port_info_set_client(info, self.client_id)
+        alsa.snd_seq_port_info_set_port(info, self.port_id)
+        alsa.snd_seq_port_info_set_name(info, self.name.encode())
+        alsa.snd_seq_port_info_set_capability(info, self.capability)
+        alsa.snd_seq_port_info_set_type(info, self.type)
+        alsa.snd_seq_port_info_set_midi_channels(info, self.midi_channels)
+        alsa.snd_seq_port_info_set_midi_voices(info, self.midi_voices)
+        alsa.snd_seq_port_info_set_synth_voices(info, self.synth_voices)
+        alsa.snd_seq_port_info_set_port_specified(info, self.port_specified)
+        alsa.snd_seq_port_info_set_timestamping(info, self.timestamping)
+        alsa.snd_seq_port_info_set_timestamp_real(info, self.timestamp_real)
+        alsa.snd_seq_port_info_set_timestamp_queue(info, self.timestamp_queue_id)
+        return info
+
+    # SequencerAddress interface – it is tuple-like
+
+    def __iter__(self):
+        return iter((self.client_id, self.port_id))
+
+    def __getitem__(self, index):
+        return (self.client_id, self.port_id)[index]
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+
+        # no isinstance() here, as two different SequencerPort object are not equal,
+        # even if they have the same address
+        if other.__class__ is SequencerAddress:
+            return (self.client_id, self.port_id) == other
+
+
+SequencerAddress.register(SequencerPortInfo)
+
+
 __all__ = ["SequencerPortCaps", "SequencerPortType", "SequencerPort",
-           "READ_PORT", "WRITE_PORT", "RW_PORT", "DEFAULT_PORT_TYPE"]
+           "READ_PORT", "WRITE_PORT", "RW_PORT", "DEFAULT_PORT_TYPE",
+           "SequencerPortInfo"]
