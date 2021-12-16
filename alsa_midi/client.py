@@ -1,7 +1,7 @@
 
 import errno
 from enum import IntEnum, IntFlag
-from typing import NewType, Optional, Tuple, Union, overload, List
+from typing import List, NewType, Optional, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
 from .address import SequencerAddress

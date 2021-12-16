@@ -1,6 +1,6 @@
 
 from enum import IntFlag
-from typing import TYPE_CHECKING, NewType, Tuple, Union, Optional
+from typing import TYPE_CHECKING, NewType, Optional, Tuple, Union
 
 from ._ffi import alsa, ffi
 from .address import SequencerAddress
