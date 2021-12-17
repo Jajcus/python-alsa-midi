@@ -5,6 +5,7 @@ import pytest
 
 from alsa_midi import (SequencerAddress, SequencerClient, SequencerPort, SequencerPortCaps,
                        SequencerPortInfo, SequencerPortType, alsa, ffi)
+from alsa_midi.port import get_port_info_sort_key
 
 
 @pytest.mark.require_alsa_seq
@@ -195,3 +196,51 @@ def test_port_info():
     assert info.timestamping is True
     assert info.timestamp_real is True
     assert info.timestamp_queue_id == 16
+
+
+def test_port_info_sort_key():
+    p0 = SequencerPortInfo(client_id=128, port_id=0, name="p0",
+                           type=SequencerPortType.MIDI_GENERIC)
+    p1 = SequencerPortInfo(client_id=128, port_id=1, name="p1",
+                           type=SequencerPortType.SPECIFIC)
+    p2 = SequencerPortInfo(client_id=128, port_id=2, name="p2",
+                           type=SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
+    p3 = SequencerPortInfo(client_id=128, port_id=3, name="p3",
+                           type=SequencerPortType.SPECIFIC)
+    p4 = SequencerPortInfo(client_id=128, port_id=4, name="p4",
+                           type=SequencerPortType.MIDI_GENERIC)
+    p4.client_name = "Midi Through"
+
+    p10 = SequencerPortInfo(client_id=129, port_id=0, name="p10",
+                            type=SequencerPortType.MIDI_GENERIC)
+    p11 = SequencerPortInfo(client_id=129, port_id=1, name="p11",
+                            type=SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER)
+
+    k = get_port_info_sort_key([])
+    assert k(p0) < k(p1)
+    assert k(p1) < k(p2)
+    assert k(p2) < k(p3)
+    assert k(p3) < k(p4)
+    assert k(p4) > k(p0)  # midi through always last
+
+    assert k(p10) > k(p0)
+    assert k(p10) > k(p1)
+    assert k(p10) > k(p3)
+    assert k(p11) > k(p10)
+    assert k(p10) < k(p4)  # midi through always last
+    assert k(p11) < k(p4)  # midi through always last
+
+    k = get_port_info_sort_key([SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER,
+                                SequencerPortType.MIDI_GENERIC])
+    assert k(p0) < k(p1)
+    assert k(p1) > k(p2)
+    assert k(p2) < k(p3)
+    assert k(p3) < k(p4)  # midi through always last
+    assert k(p4) > k(p0)  # midi through always last
+
+    assert k(p10) > k(p0)
+    assert k(p10) < k(p1)
+    assert k(p10) < k(p3)
+    assert k(p11) < k(p10)
+    assert k(p10) < k(p4)  # midi through always last
+    assert k(p11) < k(p4)  # midi through always last

@@ -1,14 +1,15 @@
 
 import errno
 from enum import IntEnum, IntFlag
-from typing import List, NewType, Optional, Tuple, Union, overload
+from typing import Any, Callable, List, NewType, Optional, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
 from .address import SequencerAddress, SequencerAddressType
 from .event import SequencerEvent
 from .exceptions import SequencerStateError
-from .port import (DEFAULT_PORT_TYPE, RW_PORT, SequencerPort, SequencerPortCaps, SequencerPortInfo,
-                   SequencerPortType, _snd_seq_port_info_t_p)
+from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
+                   WRITE_PORT_PREFERRED_TYPES, SequencerPort, SequencerPortCaps, SequencerPortInfo,
+                   SequencerPortType, _snd_seq_port_info_t_p, get_port_info_sort_key)
 from .queue import SequencerQueue
 from .util import _check_alsa_error
 
@@ -99,7 +100,7 @@ class SequencerClientInfo:
 
 
 class SequencerClient:
-    client_id: str
+    client_id: int
     handle: _snd_seq_t
     _handle_p: _snd_seq_t_p
 
@@ -272,7 +273,8 @@ class SequencerClient:
                    include_system: bool = False,
                    include_midi_through: bool = True,
                    include_no_export: bool = True,
-                   only_connectable: bool = True
+                   only_connectable: bool = True,
+                   sort: Union[bool, Callable[[SequencerPortInfo], Any]] = True,
                    ) -> List[SequencerPortInfo]:
 
         result = []
@@ -357,6 +359,22 @@ class SequencerClient:
                 alsa.snd_seq_client_info_free(client_ainfo)
             if port_ainfo is not None:
                 alsa.snd_seq_port_info_free(port_ainfo)
+
+        if callable(sort):
+            sort_key = sort
+        elif sort:
+            if input and not output:
+                sort_key = get_port_info_sort_key(READ_PORT_PREFERRED_TYPES)
+            if output and not input:
+                sort_key = get_port_info_sort_key(WRITE_PORT_PREFERRED_TYPES)
+            else:
+                sort_key = get_port_info_sort_key(RW_PORT_PREFERRED_TYPES)
+        else:
+            sort_key = None
+
+        if sort_key is not None:
+            result.sort(key=sort_key)
+
         return result
 
 

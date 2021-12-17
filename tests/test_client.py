@@ -2,7 +2,8 @@
 import pytest
 
 from alsa_midi import (SequencerALSAError, SequencerClient, SequencerClientInfo,
-                       SequencerClientType, SequencerPortCaps, SequencerStateError, alsa, ffi)
+                       SequencerClientType, SequencerPortCaps, SequencerPortType,
+                       SequencerStateError, alsa, ffi)
 from alsa_midi.port import SequencerPortInfo
 
 
@@ -438,6 +439,123 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a in port_addrs
     assert inout_port_nc_a in port_addrs
     assert inout_port_ne_a in port_addrs
+
+    other_c2.close()
+    other_c1.close()
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_list_ports_sorting(alsa_seq_state):
+
+    client = SequencerClient("test")
+
+    # test defaults
+    alsa_seq_state.load()
+    alsa_client_names = [client.name for client in alsa_seq_state.clients.values()]
+    ports = client.list_ports()
+
+    for port in ports:
+        assert isinstance(port, SequencerPortInfo)
+
+    # MIDI Through goes last
+    if "Midi Through" in alsa_client_names:
+        assert ports[-1].client_name == "Midi Through"
+
+    other_c1 = SequencerClient("other_client1")
+    specific_inout = other_c1.create_port(
+            "spec inout",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
+            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+            SequencerPortType.SPECIFIC)
+    specific_inout_a = (specific_inout.client_id, specific_inout.port_id)
+    midi_generic_input = other_c1.create_port(
+            "in",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ,
+            SequencerPortType.MIDI_GENERIC)
+    midi_generic_input_a = (midi_generic_input.client_id, midi_generic_input.port_id)
+    midi_generic_output = other_c1.create_port(
+            "out",
+            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+            SequencerPortType.MIDI_GENERIC)
+    midi_generic_output_a = (midi_generic_output.client_id, midi_generic_output.port_id)
+    midi_generic_inout = other_c1.create_port(
+            "inout",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
+            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+            SequencerPortType.MIDI_GENERIC)
+    midi_generic_inout_a = (midi_generic_inout.client_id, midi_generic_inout.port_id)
+
+    other_c2 = SequencerClient("other_client2")
+    midi_gm_input = other_c2.create_port(
+            "GM in",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ,
+            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
+    midi_gm_input_a = (midi_gm_input.client_id, midi_gm_input.port_id)
+    midi_gm_output = other_c2.create_port(
+            "GM out",
+            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
+    midi_gm_output_a = (midi_gm_output.client_id, midi_gm_output.port_id)
+    midi_gm_inout = other_c2.create_port(
+            "GM inout",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
+            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
+    midi_gm_inout_a = (midi_gm_inout.client_id, midi_gm_inout.port_id)
+    midi_synth_out = other_c2.create_port(
+            "GM Synth out",
+            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM
+            | SequencerPortType.SYNTHESIZER)
+    midi_synth_out_a = (midi_synth_out.client_id, midi_synth_out.port_id)
+
+    # no sorting -> order by client_id, port_id
+    ports = client.list_ports(only_connectable=False, include_system=True, sort=False)
+    port_addrs = [(p.client_id, p.port_id) for p in ports]
+    for i in range(0, len(port_addrs) - 1):
+        assert port_addrs[i] < port_addrs[i + 1]
+
+    # default sorting
+    ports = client.list_ports(only_connectable=False, include_system=True)
+    pa = [(p.client_id, p.port_id) for p in ports]
+
+    assert pa.index(specific_inout_a) > pa.index(midi_generic_input_a)
+    assert pa.index(midi_generic_input_a) < pa.index(midi_generic_output_a)
+    assert pa.index(midi_generic_output_a) < pa.index(midi_generic_inout_a)
+    assert pa.index(midi_generic_inout_a) < pa.index(midi_gm_input_a)
+    assert pa.index(midi_gm_input_a) < pa.index(midi_gm_output_a)
+    assert pa.index(midi_gm_output_a) < pa.index(midi_gm_inout_a)
+    assert pa.index(midi_gm_inout_a) < pa.index(midi_synth_out_a)
+    assert pa.index(specific_inout_a) > pa.index(midi_gm_inout_a)
+    if "Midi Through" in alsa_client_names:
+        assert ports[-1].client_name == "Midi Through"
+
+    # default input port sorting
+    ports = client.list_ports(only_connectable=False, include_system=True, input=True)
+    pa = [(p.client_id, p.port_id) for p in ports]
+
+    assert pa.index(specific_inout_a) > pa.index(midi_generic_input_a)
+    assert pa.index(midi_generic_input_a) < pa.index(midi_generic_inout_a)
+    assert pa.index(midi_generic_inout_a) < pa.index(midi_gm_input_a)
+    assert pa.index(midi_gm_input_a) < pa.index(midi_gm_inout_a)
+    assert pa.index(specific_inout_a) > pa.index(midi_gm_inout_a)
+    if "Midi Through" in alsa_client_names:
+        assert ports[-1].client_name == "Midi Through"
+
+    # default output port sorting
+    ports = client.list_ports(only_connectable=False, include_system=True, output=True)
+    pa = [(p.client_id, p.port_id) for p in ports]
+
+    assert pa.index(specific_inout_a) > pa.index(midi_generic_output_a)
+    assert pa.index(midi_generic_output_a) < pa.index(midi_generic_inout_a)
+    assert pa.index(midi_generic_inout_a) > pa.index(midi_gm_output_a)
+    assert pa.index(midi_gm_output_a) < pa.index(midi_gm_inout_a)
+    assert pa.index(midi_gm_inout_a) > pa.index(midi_synth_out_a)
+    assert pa.index(midi_synth_out_a) < pa.index(midi_generic_output_a)
+    assert pa.index(specific_inout_a) > pa.index(midi_synth_out_a)
+    if "Midi Through" in alsa_client_names:
+        assert ports[-1].client_name == "Midi Through"
 
     other_c2.close()
     other_c1.close()

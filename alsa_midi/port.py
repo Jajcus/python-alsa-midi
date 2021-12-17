@@ -1,6 +1,6 @@
 
 from enum import IntFlag
-from typing import TYPE_CHECKING, NewType, Optional, Tuple
+from typing import TYPE_CHECKING, List, NewType, Optional, Tuple
 
 from ._ffi import alsa, ffi
 from .address import SequencerAddress, SequencerAddressType
@@ -46,10 +46,27 @@ READ_PORT = SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
 WRITE_PORT = SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
 RW_PORT = READ_PORT | WRITE_PORT
 
+READ_PORT_PREFERRED_TYPES = [
+        SequencerPortType.MIDI_GENERIC
+        ]
+
+RW_PORT_PREFERRED_TYPES = READ_PORT_PREFERRED_TYPES
+
+WRITE_PORT_PREFERRED_TYPES = [
+        SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM
+        | SequencerPortType.SYNTHESIZER,
+        SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER,
+        SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM,
+        SequencerPortType.MIDI_GENERIC
+        ]
+
 DEFAULT_PORT_TYPE = SequencerPortType.MIDI_GENERIC | SequencerPortType.SOFTWARE
 
 
 class SequencerPort:
+    client_id: int
+    port_id: int
+
     def __init__(self, client: 'SequencerClient', port_id: int):
         self.client_id = client.client_id
         self.port_id = port_id
@@ -210,6 +227,19 @@ class SequencerPortInfo:
         return info
 
 
+def get_port_info_sort_key(preferred_types: List[SequencerPortType] = []):
+    def key(info: SequencerPortInfo):
+        is_midi_through = info.client_name == "Midi Through"
+        preference = len(preferred_types)
+        for i, types in enumerate(preferred_types):
+            if info.type & types == types:
+                preference = i
+                break
+        return (is_midi_through, preference, info.client_id, info.port_id)
+    return key
+
+
 __all__ = ["SequencerPortCaps", "SequencerPortType", "SequencerPort",
            "READ_PORT", "WRITE_PORT", "RW_PORT", "DEFAULT_PORT_TYPE",
+           "READ_PORT_PREFERRED_TYPES", "WRITE_PORT_PREFERRED_TYPES", "RW_PORT_PREFERRED_TYPES",
            "SequencerPortInfo"]
