@@ -174,6 +174,16 @@ class SequencerClientBase:
         _check_alsa_error(queue)
         return SequencerQueue(self, queue)
 
+    def drop_input(self):
+        self._check_handle()
+        err = alsa.snd_seq_drop_input(self.handle)
+        _check_alsa_error(err)
+
+    def drop_buffer(self):
+        self._check_handle()
+        err = alsa.snd_seq_drop_input_buffer(self.handle)
+        _check_alsa_error(err)
+
     def drain_output(self):
         self._check_handle()
         err = alsa.snd_seq_drain_output(self.handle)
@@ -502,4 +512,4 @@ class SequencerClient(SequencerClientBase):
         return self._event_output_wait(func)
 
 
-__all__ = ["SequencerClient", "SequencerClientInfo", "SequencerClientType"]
+__all__ = ["SequencerClientBase", "SequencerClient", "SequencerClientInfo", "SequencerClientType"]

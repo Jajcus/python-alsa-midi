@@ -1,6 +1,7 @@
 
 import os
 import re
+import subprocess
 from typing import Dict, List, Tuple
 
 import pytest
@@ -225,6 +226,21 @@ if not alsa_seq_present:
         pass
 
 
+def _check_aplaymidi():
+    try:
+        subprocess.run(["aplaymidi", "--version"], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return True
+
+
+tools_present = {}
+tools_checks = {
+        "aplaymidi": _check_aplaymidi,
+        }
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers", "require_alsa_seq: mark test to require ALSA sequencer in the kernel"
@@ -232,10 +248,13 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "require_no_alsa_seq: mark test to require ALSA sequencer in the kernel"
     )
+    config.addinivalue_line(
+        "markers", "require_tool: mark test to require a specific tool"
+    )
 
 
 @pytest.fixture(autouse=True)
-def skip_if_no_alsa(request):
+def skip_if_no_alsa_or_tool(request):
     marker = request.node.get_closest_marker("require_alsa_seq")
     if marker:
         if not alsa_seq_present:
@@ -245,4 +264,15 @@ def skip_if_no_alsa(request):
     if marker:
         if alsa_seq_present:
             pytest.skip("ALSA sequencer available in kernel, but unwanted by this test")
+            return
+    marker = request.node.get_closest_marker("require_tool")
+    if marker:
+        tool = marker.args[0]
+        if tool in tools_present:
+            present = tools_present[tool]
+        else:
+            present = tools_checks[tool]()
+            tools_present[tool] = present
+        if not present:
+            pytest.skip(f"Tool {tool!r} not available")
             return
