@@ -181,6 +181,50 @@ def test_query_next_client(alsa_seq_state):
 
 
 @pytest.mark.require_alsa_seq
+def test_query_next_port(alsa_seq_state):
+    client = SequencerClient("test")
+    alsa_seq_state.load()
+
+    # let's test it on the 'System' ports. They should always be there.
+    client_id = 0
+
+    first_port_id = min(port_id for port_id in alsa_seq_state.clients[client_id].ports)
+    last_port_id = max(port_id for port_id in alsa_seq_state.clients[client_id].ports)
+
+    all_infos = []
+
+    info = client.query_next_port(client_id)
+    assert info is not None
+    assert info.port_id == first_port_id
+
+    port_id = -1
+
+    while info is not None:
+        all_infos.append(info)
+        port_id = info.port_id
+        alsa_port = alsa_seq_state.clients[client_id].ports[port_id]
+
+        assert info.client_id == alsa_port.client_id
+        assert info.name == alsa_port.name
+
+        assert (SequencerPortCaps.WRITE in info.capability) == ("w" in alsa_port.flags.lower())
+        assert (SequencerPortCaps.SUBS_WRITE in info.capability) == ("W" in alsa_port.flags)
+        assert (SequencerPortCaps.READ in info.capability) == ("r" in alsa_port.flags.lower())
+        assert (SequencerPortCaps.SUBS_READ in info.capability) == ("R" in alsa_port.flags)
+
+        assert info.read_use == len(alsa_port.connected_to)
+        assert info.write_use == len(alsa_port.connected_from)
+
+        info = client.query_next_port(client_id, info)
+
+    assert port_id == last_port_id
+
+    assert len(all_infos) == len(alsa_seq_state.clients[client_id].ports)
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
 def test_list_ports(alsa_seq_state):
 
     client = SequencerClient("test")
