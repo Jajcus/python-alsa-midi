@@ -83,11 +83,9 @@ def test_port_as_address():
 
     assert port.client_id == 129
     assert port.port_id == 3
-    assert isinstance(port, SequencerAddress)
-    assert SequencerAddress(port) == SequencerAddress(129, 3)
-    assert tuple(port) == (129, 3)
-    assert port == SequencerAddress(129, 3)
-    assert SequencerAddress(129, 3) == port
+
+    addr = SequencerAddress(port)
+    assert addr == SequencerAddress(129, 3)
 
 
 def test_port_info():
@@ -109,6 +107,7 @@ def test_port_info():
     assert info.timestamping is False
     assert info.timestamp_real is False
     assert info.timestamp_queue_id == 0
+    assert SequencerAddress(info) == SequencerAddress(11, 0)
 
     # test initializing all attributes
     info = SequencerPortInfo(client_id=15,
@@ -139,6 +138,7 @@ def test_port_info():
     assert info.timestamping is True
     assert info.timestamp_real is True
     assert info.timestamp_queue_id == 6
+    assert SequencerAddress(info) == SequencerAddress(15, 17)
 
     # test _to_alsa (only some values are writable to the ALSA struct)
     alsa_info = info._to_alsa()

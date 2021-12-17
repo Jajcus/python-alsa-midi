@@ -1,9 +1,9 @@
 
 from enum import IntFlag
-from typing import TYPE_CHECKING, NewType, Optional, Tuple, Union
+from typing import TYPE_CHECKING, NewType, Optional, Tuple
 
 from ._ffi import alsa, ffi
-from .address import SequencerAddress
+from .address import SequencerAddress, SequencerAddressType
 from .exceptions import SequencerError, SequencerStateError
 from .util import _check_alsa_error
 
@@ -79,49 +79,29 @@ class SequencerPort:
             err = alsa.snd_seq_delete_simple_port(handle, port_id)
             _check_alsa_error(err)
 
-    def connect_to(self, dest: Union[SequencerAddress, Tuple[int, int]]):
-        client_id, port_id = dest
+    def connect_to(self, dest: SequencerAddressType):
+        client_id, port_id = SequencerAddress(dest)
         handle = self._get_client_handle()
         err = alsa.snd_seq_connect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
-    def disconnect_to(self, dest: Union[SequencerAddress, Tuple[int, int]]):
-        client_id, port_id = dest
+    def disconnect_to(self, dest: SequencerAddressType):
+        client_id, port_id = SequencerAddress(dest)
         handle = self._get_client_handle()
         err = alsa.snd_seq_disconnect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
-    def connect_from(self, src: Union[SequencerAddress, Tuple[int, int]]):
-        client_id, port_id = src
+    def connect_from(self, src: SequencerAddressType):
+        client_id, port_id = SequencerAddress(src)
         handle = self._get_client_handle()
         err = alsa.snd_seq_connect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
-    def disconnect_from(self, src: Union[SequencerAddress, Tuple[int, int]]):
-        client_id, port_id = src
+    def disconnect_from(self, src: SequencerAddressType):
+        client_id, port_id = SequencerAddress(src)
         handle = self._get_client_handle()
         err = alsa.snd_seq_disconnect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
-
-    # SequencerAddress interface – it is tuple-like
-
-    def __iter__(self):
-        return iter((self.client_id, self.port_id))
-
-    def __getitem__(self, index):
-        return (self.client_id, self.port_id)[index]
-
-    def __eq__(self, other):
-        if self is other:
-            return True
-
-        # no isinstance() here, as two different SequencerPort object are not equal,
-        # even if they have the same address
-        if other.__class__ is SequencerAddress:
-            return (self.client_id, self.port_id) == other
-
-
-SequencerAddress.register(SequencerPort)
 
 
 _snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)
@@ -228,26 +208,6 @@ class SequencerPortInfo:
         alsa.snd_seq_port_info_set_timestamp_real(info, self.timestamp_real)
         alsa.snd_seq_port_info_set_timestamp_queue(info, self.timestamp_queue_id)
         return info
-
-    # SequencerAddress interface – it is tuple-like
-
-    def __iter__(self):
-        return iter((self.client_id, self.port_id))
-
-    def __getitem__(self, index):
-        return (self.client_id, self.port_id)[index]
-
-    def __eq__(self, other):
-        if self is other:
-            return True
-
-        # no isinstance() here, as two different SequencerPort object are not equal,
-        # even if they have the same address
-        if other.__class__ is SequencerAddress:
-            return (self.client_id, self.port_id) == other
-
-
-SequencerAddress.register(SequencerPortInfo)
 
 
 __all__ = ["SequencerPortCaps", "SequencerPortType", "SequencerPort",

@@ -1,16 +1,22 @@
 
-from abc import ABCMeta
 from collections import namedtuple
-from typing import TYPE_CHECKING, Tuple, Union, overload
+from typing import TYPE_CHECKING, Any, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
     from .client import SequencerClient
+    from .port import SequencerPort, SequencerPortInfo
 
 
-class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id"), metaclass=ABCMeta):
+SequencerAddressType = Union['SequencerAddress',
+                             'SequencerPort',
+                             'SequencerPortInfo',
+                             Tuple[int, int]]
+
+
+class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id")):
     __slots__ = ()
 
     @overload
@@ -18,7 +24,7 @@ class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id"), meta
         ...
 
     @overload
-    def __new__(cls, arg1: Tuple[int, int]) -> 'SequencerAddress':
+    def __new__(cls, arg1: SequencerAddressType) -> 'SequencerAddress':
         ...
 
     @overload
@@ -26,26 +32,26 @@ class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id"), meta
         ...
 
     @overload
-    def __new__(cls, arg1: 'SequencerAddress') -> 'SequencerAddress':
-        ...
-
-    @overload
     def __new__(cls, arg1: 'SequencerClient', arg2: int = 0) -> 'SequencerAddress':
         ...
 
     def __new__(cls,
-                arg1: Union[int, str, 'SequencerClient', tuple],
+                arg1: Union[int, str, SequencerAddressType, 'SequencerClient'],
                 arg2: int = 0) -> 'SequencerAddress':
         if isinstance(arg1, str):
-            return super().__new__(cls, *cls._parse(arg1))
+            tple: Any = cls._parse(arg1)
+            return tuple.__new__(cls, tple)
         elif hasattr(arg1, "client_id"):
             client_id = arg1.client_id  # type: ignore
             port_id = getattr(arg1, "port_id", arg2)
-            return super().__new__(cls, client_id, port_id)
+            tple: Any = (client_id, port_id)
+            return tuple.__new__(cls, tple)
         elif isinstance(arg1, tuple):
-            return super().__new__(cls, *arg1)
+            tple: Any = arg1
+            return tuple.__new__(cls, tple)
         else:
-            return super().__new__(cls, arg1, arg2)
+            tple: Any = (int(arg1), int(arg2))  # type: ignore
+            return tuple.__new__(cls, tple)
 
     @staticmethod
     def _parse(arg: str) -> Tuple[int, int]:
@@ -63,4 +69,5 @@ SYSTEM_TIMER = SequencerAddress(alsa.SND_SEQ_CLIENT_SYSTEM, alsa.SND_SEQ_PORT_SY
 SYSTEM_ANNOUNCE = SequencerAddress(alsa.SND_SEQ_CLIENT_SYSTEM,
                                    alsa.SND_SEQ_PORT_SYSTEM_ANNOUNCE)
 
-__all__ = ["SequencerAddress", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE"]
+__all__ = ["SequencerAddress", "SequencerAddressType",
+           "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE"]

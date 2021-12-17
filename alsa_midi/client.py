@@ -4,7 +4,7 @@ from enum import IntEnum, IntFlag
 from typing import List, NewType, Optional, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
-from .address import SequencerAddress
+from .address import SequencerAddress, SequencerAddressType
 from .event import SequencerEvent
 from .exceptions import SequencerStateError
 from .port import (DEFAULT_PORT_TYPE, RW_PORT, SequencerPort, SequencerPortCaps, SequencerPortInfo,
@@ -177,7 +177,7 @@ class SequencerClient:
                      event: SequencerEvent,
                      queue: Union['SequencerQueue', int] = None,
                      port: Union['SequencerPort', int] = None,
-                     dest: SequencerAddress = None):
+                     dest: SequencerAddressType = None):
         self._check_handle()
         alsa_event = event._to_alsa()
         if queue is not None:
@@ -193,6 +193,7 @@ class SequencerClient:
             else:
                 alsa_event.source.port = port
         if dest is not None:
+            dest = SequencerAddress(dest)
             alsa_event.dest.client = dest.client_id
             alsa_event.dest.port = dest.port_id
         elif event.dest is None:
