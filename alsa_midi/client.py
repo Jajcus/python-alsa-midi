@@ -270,6 +270,7 @@ class SequencerClient:
     def list_ports(self, *,
                    input: bool = None,
                    output: bool = None,
+                   type: SequencerPortType = SequencerPortType.MIDI_GENERIC,
                    include_system: bool = False,
                    include_midi_through: bool = True,
                    include_no_export: bool = True,
@@ -319,6 +320,9 @@ class SequencerClient:
                     _check_alsa_error(err)
 
                     port_info = SequencerPortInfo._from_alsa(port_ainfo)
+
+                    if type and (port_info.type & type) != type:
+                        continue
 
                     if port_info.capability & SequencerPortCaps.NO_EXPORT \
                             and not include_no_export:

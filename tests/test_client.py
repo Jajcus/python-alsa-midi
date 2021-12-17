@@ -270,6 +270,12 @@ def test_list_ports(alsa_seq_state):
             SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
             | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE)
     inout_port_a = (inout_port.client_id, inout_port.port_id)
+    s_inout_port = other_c1.create_port(
+            "inout",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
+            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
+            SequencerPortType.SPECIFIC)
+    s_inout_port_a = (s_inout_port.client_id, s_inout_port.port_id)
 
     # a client with a set of unconnectable or noexport ports
     other_c2 = SequencerClient("other_client2")
@@ -302,6 +308,7 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test output=True
     ports = client.list_ports(output=True)
@@ -315,6 +322,7 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test input=True output=True
     ports = client.list_ports(input=True, output=True)
@@ -328,9 +336,10 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test include_system=True
-    ports = client.list_ports(include_system=True)
+    ports = client.list_ports(include_system=True, type=SequencerPortType.ANY)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     client_names = {p.client_name for p in ports}
     if "Midi Through" in alsa_client_names:
@@ -346,7 +355,7 @@ def test_list_ports(alsa_seq_state):
     assert inout_port_ne_a in port_addrs
 
     # test include_system=False
-    ports = client.list_ports(include_system=False)
+    ports = client.list_ports(include_system=False, type=SequencerPortType.ANY)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     client_names = {p.client_name for p in ports}
     if "Midi Through" in alsa_client_names:
@@ -376,6 +385,7 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test include_midi_through=False
     ports = client.list_ports(include_midi_through=False)
@@ -391,6 +401,7 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test include_no_export=True
     ports = client.list_ports(include_no_export=True)
@@ -403,6 +414,7 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test include_no_export=False
     ports = client.list_ports(include_no_export=False)
@@ -415,6 +427,7 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a not in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test only_connectable=True
     ports = client.list_ports(only_connectable=True)
@@ -427,6 +440,7 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a not in port_addrs
     assert inout_port_nc_a not in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
 
     # test only_connectable=False
     ports = client.list_ports(only_connectable=False)
@@ -439,6 +453,19 @@ def test_list_ports(alsa_seq_state):
     assert output_port_nc_a in port_addrs
     assert inout_port_nc_a in port_addrs
     assert inout_port_ne_a in port_addrs
+    assert s_inout_port_a not in port_addrs
+
+    # test type=SequencerPortType.SPECIFIC
+    ports = client.list_ports(type=SequencerPortType.SPECIFIC)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    assert input_port_a not in port_addrs
+    assert output_port_a not in port_addrs
+    assert inout_port_a not in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a not in port_addrs
+    assert s_inout_port_a in port_addrs
 
     other_c2.close()
     other_c1.close()
@@ -453,7 +480,7 @@ def test_list_ports_sorting(alsa_seq_state):
     # test defaults
     alsa_seq_state.load()
     alsa_client_names = [client.name for client in alsa_seq_state.clients.values()]
-    ports = client.list_ports()
+    ports = client.list_ports(type=SequencerPortType.ANY)
 
     for port in ports:
         assert isinstance(port, SequencerPortInfo)
@@ -511,13 +538,15 @@ def test_list_ports_sorting(alsa_seq_state):
     midi_synth_out_a = (midi_synth_out.client_id, midi_synth_out.port_id)
 
     # no sorting -> order by client_id, port_id
-    ports = client.list_ports(only_connectable=False, include_system=True, sort=False)
+    ports = client.list_ports(only_connectable=False, include_system=True, sort=False,
+                              type=SequencerPortType.ANY)
     port_addrs = [(p.client_id, p.port_id) for p in ports]
     for i in range(0, len(port_addrs) - 1):
         assert port_addrs[i] < port_addrs[i + 1]
 
     # default sorting
-    ports = client.list_ports(only_connectable=False, include_system=True)
+    ports = client.list_ports(only_connectable=False, include_system=True,
+                              type=SequencerPortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 
     assert pa.index(specific_inout_a) > pa.index(midi_generic_input_a)
@@ -532,7 +561,8 @@ def test_list_ports_sorting(alsa_seq_state):
         assert ports[-1].client_name == "Midi Through"
 
     # default input port sorting
-    ports = client.list_ports(only_connectable=False, include_system=True, input=True)
+    ports = client.list_ports(only_connectable=False, include_system=True, input=True,
+                              type=SequencerPortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 
     assert pa.index(specific_inout_a) > pa.index(midi_generic_input_a)
@@ -544,7 +574,8 @@ def test_list_ports_sorting(alsa_seq_state):
         assert ports[-1].client_name == "Midi Through"
 
     # default output port sorting
-    ports = client.list_ports(only_connectable=False, include_system=True, output=True)
+    ports = client.list_ports(only_connectable=False, include_system=True, output=True,
+                              type=SequencerPortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 
     assert pa.index(specific_inout_a) > pa.index(midi_generic_output_a)

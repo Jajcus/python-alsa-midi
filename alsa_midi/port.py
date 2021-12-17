@@ -24,7 +24,7 @@ class SequencerPortCaps(IntFlag):
 
 
 class SequencerPortType(IntFlag):
-    _NONE = 0
+    ANY = 0
     SPECIFIC = alsa.SND_SEQ_PORT_TYPE_SPECIFIC
     MIDI_GENERIC = alsa.SND_SEQ_PORT_TYPE_MIDI_GENERIC
     MIDI_GM = alsa.SND_SEQ_PORT_TYPE_MIDI_GM
@@ -148,7 +148,7 @@ class SequencerPortInfo:
                  port_id: int = None,
                  name: str = None,
                  capability: SequencerPortCaps = SequencerPortCaps._NONE,
-                 type: SequencerPortType = SequencerPortType._NONE,
+                 type: SequencerPortType = SequencerPortType.ANY,
                  midi_channels: int = 0,
                  midi_voices: int = 0,
                  synth_voices: int = 0,

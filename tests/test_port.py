@@ -98,7 +98,7 @@ def test_port_info():
     assert info.port_id == 0
     assert info.name == ""
     assert info.capability == SequencerPortCaps._NONE
-    assert info.type == SequencerPortType._NONE
+    assert info.type == SequencerPortType.ANY
     assert info.midi_channels == 0
     assert info.midi_voices == 0
     assert info.synth_voices == 0

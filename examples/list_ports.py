@@ -1,8 +1,27 @@
 #!/usr/bin/env python3
 
-from argparse import ArgumentParser
+import re
+from argparse import ArgumentParser, ArgumentTypeError
 
-from alsa_midi import SequencerClient
+from alsa_midi import SequencerClient, SequencerPortType
+
+
+def flag_parser(flag_type):
+    prefix = flag_type.__name__ + "."
+    prefix_l = len(prefix)
+
+    def parse(string):
+        result = flag_type(0)
+        for value in re.split(r"[\s,;|]", string):
+            if value.startswith(prefix):
+                value = value[prefix_l:]
+            try:
+                result |= flag_type[value.upper()]
+            except KeyError:
+                raise ArgumentTypeError(f"Invalid {flag_type.__name__} value: {value!r}")
+        return result
+
+    return parse
 
 
 def main():
@@ -11,6 +30,9 @@ def main():
                         help="Show input ports")
     parser.add_argument("--output", action="store_true",
                         help="Show output ports")
+    parser.add_argument("--type", type=flag_parser(SequencerPortType),
+                        default=SequencerPortType.MIDI_GENERIC,
+                        help="Show only ports of this type (default: MIDI_GENERIC)")
     parser.add_argument("--system", action="store_true", default=False,
                         help="Include system ports")
     parser.add_argument("--no-midi-through", action="store_true", default=False,
@@ -24,6 +46,7 @@ def main():
 
     ports = client.list_ports(input=args.input,
                               output=args.output,
+                              type=args.type,
                               include_system=args.system,
                               include_midi_through=not args.no_midi_through)
 
