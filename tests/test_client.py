@@ -2,7 +2,8 @@
 import pytest
 
 from alsa_midi import (SequencerALSAError, SequencerClient, SequencerClientInfo,
-                       SequencerClientType, SequencerStateError, alsa, ffi)
+                       SequencerClientType, SequencerPortCaps, SequencerStateError, alsa, ffi)
+from alsa_midi.port import SequencerPortInfo
 
 
 @pytest.mark.require_no_alsa_seq
@@ -176,4 +177,224 @@ def test_query_next_client(alsa_seq_state):
 
     assert len(all_infos) == len(alsa_seq_state.clients)
 
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_list_ports(alsa_seq_state):
+
+    client = SequencerClient("test")
+
+    # test defaults
+    alsa_seq_state.load()
+    alsa_client_names = [client.name for client in alsa_seq_state.clients.values()]
+    ports = client.list_ports()
+
+    for port in ports:
+        assert isinstance(port, SequencerPortInfo)
+
+    alsa_ports = []
+    for alsa_port in alsa_seq_state.ports.values():
+        if alsa_port.client_id == 0:
+            # exclude system ports
+            continue
+        if "W" not in alsa_port.flags and "R" not in alsa_port.flags:
+            # exclude unconnectable
+            continue
+        alsa_ports.append(alsa_port)
+
+    assert len(ports) == len(alsa_ports)
+
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    alsa_ports_addrs = {(p.client_id, p.port_id) for p in alsa_ports}
+
+    assert port_addrs == alsa_ports_addrs
+
+    # a client with a set of connectable ports
+    other_c1 = SequencerClient("other_client1")
+    input_port = other_c1.create_port(
+            "in",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ)
+    input_port_a = (input_port.client_id, input_port.port_id)
+    output_port = other_c1.create_port(
+            "out",
+            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE)
+    output_port_a = (output_port.client_id, output_port.port_id)
+    inout_port = other_c1.create_port(
+            "inout",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
+            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE)
+    inout_port_a = (inout_port.client_id, inout_port.port_id)
+
+    # a client with a set of unconnectable or noexport ports
+    other_c2 = SequencerClient("other_client2")
+    input_port_nc = other_c2.create_port(
+            "in",
+            SequencerPortCaps.READ)
+    input_port_nc_a = (input_port_nc.client_id, input_port_nc.port_id)
+    output_port_nc = other_c2.create_port(
+            "out",
+            SequencerPortCaps.WRITE)
+    output_port_nc_a = (output_port_nc.client_id, output_port_nc.port_id)
+    inout_port_nc = other_c2.create_port(
+            "inout",
+            SequencerPortCaps.READ | SequencerPortCaps.WRITE)
+    inout_port_nc_a = (inout_port_nc.client_id, inout_port_nc.port_id)
+    inout_port_ne = other_c2.create_port(
+            "inout",
+            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
+            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
+            | SequencerPortCaps.NO_EXPORT)
+    inout_port_ne_a = (inout_port_ne.client_id, inout_port_ne.port_id)
+
+    # test input=True
+    ports = client.list_ports(input=True)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    assert input_port_a in port_addrs
+    assert output_port_a not in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test output=True
+    ports = client.list_ports(output=True)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    assert (0, 0) not in port_addrs
+    assert (0, 1) not in port_addrs
+    assert input_port_a not in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test input=True output=True
+    ports = client.list_ports(input=True, output=True)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    assert (0, 0) not in port_addrs
+    assert (0, 1) not in port_addrs
+    assert input_port_a not in port_addrs
+    assert output_port_a not in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test include_system=True
+    ports = client.list_ports(include_system=True)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    if "Midi Through" in alsa_client_names:
+        assert "Midi Through" in client_names
+    assert (0, 0) in port_addrs
+    assert (0, 1) in port_addrs
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test include_system=False
+    ports = client.list_ports(include_system=False)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    if "Midi Through" in alsa_client_names:
+        assert "Midi Through" in client_names
+    assert (0, 0) not in port_addrs
+    assert (0, 1) not in port_addrs
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test include_midi_through=True
+    ports = client.list_ports(include_midi_through=True)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    if "Midi Through" in alsa_client_names:
+        assert "Midi Through" in client_names
+    assert (0, 0) not in port_addrs
+    assert (0, 1) not in port_addrs
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test include_midi_through=False
+    ports = client.list_ports(include_midi_through=False)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    assert "Midi Through" not in client_names
+    assert (0, 0) not in port_addrs
+    assert (0, 1) not in port_addrs
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test include_no_export=True
+    ports = client.list_ports(include_no_export=True)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test include_no_export=False
+    ports = client.list_ports(include_no_export=False)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a not in port_addrs
+
+    # test only_connectable=True
+    ports = client.list_ports(only_connectable=True)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a not in port_addrs
+    assert output_port_nc_a not in port_addrs
+    assert inout_port_nc_a not in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    # test only_connectable=False
+    ports = client.list_ports(only_connectable=False)
+    port_addrs = {(p.client_id, p.port_id) for p in ports}
+    client_names = {p.client_name for p in ports}
+    assert input_port_a in port_addrs
+    assert output_port_a in port_addrs
+    assert inout_port_a in port_addrs
+    assert input_port_nc_a in port_addrs
+    assert output_port_nc_a in port_addrs
+    assert inout_port_nc_a in port_addrs
+    assert inout_port_ne_a in port_addrs
+
+    other_c2.close()
+    other_c1.close()
     client.close()

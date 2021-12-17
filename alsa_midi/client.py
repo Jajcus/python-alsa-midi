@@ -317,7 +317,8 @@ class SequencerClient:
 
                     port_info = SequencerPortInfo._from_alsa(port_ainfo)
 
-                    if port_info.capability & SequencerPortCaps.NO_EXPORT and include_no_export:
+                    if port_info.capability & SequencerPortCaps.NO_EXPORT \
+                            and not include_no_export:
                         continue
 
                     can_write = port_info.capability & SequencerPortCaps.WRITE
