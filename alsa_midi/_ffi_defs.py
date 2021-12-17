@@ -886,6 +886,16 @@ int snd_seq_parse_address(snd_seq_t *seq, snd_seq_addr_t *addr, const char *str)
 
 int snd_seq_reset_pool_output(snd_seq_t *seq);
 int snd_seq_reset_pool_input(snd_seq_t *seq);
+
+/*******************************************************************************************************/
+
+/* poll.h */
+
+struct pollfd {
+        int fd;
+        short events;
+        short revents;
+};
 """
 
 ffi.set_source("alsa_midi._ffi_bin", C_SOURCE, libraries=["asound"])

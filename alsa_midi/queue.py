@@ -7,11 +7,11 @@ from .exceptions import SequencerError, SequencerStateError
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
-    from .client import SequencerClient, _snd_seq_t
+    from .client import SequencerClientBase, _snd_seq_t
 
 
 class SequencerQueue:
-    def __init__(self, client: 'SequencerClient', queue_id: int):
+    def __init__(self, client: 'SequencerClientBase', queue_id: int):
         self.client = client
         self.queue_id = queue_id
 

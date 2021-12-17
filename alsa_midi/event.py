@@ -1,10 +1,14 @@
 
 from enum import IntEnum
-from typing import Any, NewType, Optional, Tuple
+from typing import TYPE_CHECKING, Any, NewType, Optional, Tuple, Union
 
 from ._ffi import alsa, ffi
-from .address import SequencerAddress
+from .address import SequencerAddress, SequencerAddressType
 from .util import _ensure_4bit, _ensure_7bit
+
+if TYPE_CHECKING:
+    from .port import SequencerPort
+    from .queue import SequencerQueue
 
 
 class SequencerEventType(IntEnum):
@@ -157,7 +161,11 @@ class SequencerEvent:
                    raw_data=raw_data,
                    **kwargs)
 
-    def _to_alsa(self):
+    def _to_alsa(self, *,
+                 queue: Union['SequencerQueue', int] = None,
+                 port: Union['SequencerPort', int] = None,
+                 dest: SequencerAddressType = None
+                 ) -> _snd_seq_event_t:
         event: _snd_seq_event_t = ffi.new("snd_seq_event_t *")
         assert self.type is not None
         event.type = int(self.type)
@@ -166,8 +174,12 @@ class SequencerEvent:
         else:
             flags = 0
         event.tag = self.tag
-        if self.queue is not None:
+        if queue is not None:
+            event.queue = queue
+        elif self.queue is not None:
             event.queue = self.queue
+        else:
+            event.queue = alsa.SND_SEQ_QUEUE_DIRECT
         assert self.time is None or self.tick is None
         if self.time is not None:
             sec = int(self.time)
@@ -181,12 +193,23 @@ class SequencerEvent:
         if self.relative is not None:
             rel = alsa.SND_SEQ_TIME_MODE_REL if self.relative else alsa.SND_SEQ_TIME_MODE_ABS
             flags &= ~(alsa.SND_SEQ_TIME_MODE_MASK | rel)
-        if self.source is not None:
+        if port is not None:
+            if isinstance(port, int):
+                event.source.port = port
+            else:
+                event.source.port = port.port_id
+        elif self.source is not None:
             event.source.client = self.source.client_id
             event.source.port = self.source.port_id
-        if self.dest is not None:
+        if dest is not None:
+            client_id, port_id = SequencerAddress(dest)
+            event.dest.client = client_id
+            event.dest.port = port_id
+        elif self.dest is not None:
             event.dest.client = self.dest.client_id
             event.dest.port = self.dest.port_id
+        else:
+            event.dest.client = alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
 
         if self.__class__ == SequencerEvent and self.raw_data is not None:
             # not for subclasses:
@@ -230,8 +253,8 @@ class SequencerNoteEventBase(SequencerEvent):
         kwargs["velocity"] = event.data.note.velocity
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self):
-        event: _snd_seq_event_t = super()._to_alsa()
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
         event.data.note.note = self.note
         event.data.note.channel = self.channel
         event.data.note.velocity = self.velocity
@@ -262,8 +285,8 @@ class SequencerNoteEvent(SequencerNoteEventBase):
         kwargs["duration"] = event.data.note.duration
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self):
-        event: _snd_seq_event_t = super()._to_alsa()
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
         event.data.note.off_velocity = self.off_velocity
         event.data.note.duration = self.duration
         return event

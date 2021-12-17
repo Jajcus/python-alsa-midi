@@ -1,10 +1,13 @@
 
 import errno
+import select
+import time
 from enum import IntEnum, IntFlag
+from functools import partial
 from typing import Any, Callable, List, NewType, Optional, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
-from .address import SequencerAddress, SequencerAddressType
+from .address import SequencerAddressType
 from .event import SequencerEvent
 from .exceptions import SequencerStateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
@@ -99,10 +102,12 @@ class SequencerClientInfo:
         return info
 
 
-class SequencerClient:
+class SequencerClientBase:
     client_id: int
     handle: _snd_seq_t
     _handle_p: _snd_seq_t_p
+    _read_fds: List[int] = []
+    _write_fds: List[int] = []
 
     def __init__(
             self,
@@ -119,6 +124,7 @@ class SequencerClient:
         self.handle = self._handle_p[0]
         alsa.snd_seq_set_client_name(self.handle, client_name_b)
         self.client_id = alsa.snd_seq_client_id(self.handle)
+        self._get_fds()
 
     def __del__(self):
         self.close()
@@ -134,6 +140,18 @@ class SequencerClient:
             alsa.snd_seq_close(self._handle_p[0])
         self._handle_p = None  # type: ignore
         self.handle = None  # type: ignore
+
+    def _get_fds(self):
+        pfds_count = alsa.snd_seq_poll_descriptors_count(self.handle,
+                                                         select.POLLIN | select.POLLOUT)
+        pfds = ffi.new("struct pollfd[]", pfds_count)
+        filled = alsa.snd_seq_poll_descriptors(self.handle, pfds, pfds_count,
+                                               select.POLLIN | select.POLLOUT)
+        for i in range(0, filled):
+            if pfds[i].events & select.POLLIN:
+                self._read_fds.append(pfds[i].fd)
+            if pfds[i].events & select.POLLOUT:
+                self._write_fds.append(pfds[i].fd)
 
     def create_port(self,
                     name: str,
@@ -166,13 +184,28 @@ class SequencerClient:
         err = alsa.snd_seq_drop_output(self.handle)
         _check_alsa_error(err)
 
+    def _event_input(self) -> Tuple[int, Optional[SequencerEvent]]:
+        buf = ffi.new("snd_seq_event_t**", ffi.NULL)
+        result = alsa.snd_seq_event_input(self.handle, buf)
+        if result >= 0:
+            cls = SequencerEvent._specialized.get(buf[0].type, SequencerEvent)
+            return result, cls._from_alsa(buf[0])
+        else:
+            return result, None
+
     def event_input(self):
-        self._check_handle()
-        result = ffi.new("snd_seq_event_t**", ffi.NULL)
-        err = alsa.snd_seq_event_input(self.handle, result)
-        _check_alsa_error(err)
-        cls = SequencerEvent._specialized.get(result[0].type, SequencerEvent)
-        return cls._from_alsa(result[0])
+        result, event = self._event_input()
+        _check_alsa_error(result)
+        return event
+
+    def _event_output(self,
+                      event: SequencerEvent,
+                      queue: Union['SequencerQueue', int] = None,
+                      port: Union['SequencerPort', int] = None,
+                      dest: SequencerAddressType = None):
+        alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
+        result = alsa.snd_seq_event_output(self.handle, alsa_event)
+        return result
 
     def event_output(self,
                      event: SequencerEvent,
@@ -180,27 +213,39 @@ class SequencerClient:
                      port: Union['SequencerPort', int] = None,
                      dest: SequencerAddressType = None):
         self._check_handle()
-        alsa_event = event._to_alsa()
-        if queue is not None:
-            if isinstance(queue, SequencerQueue):
-                alsa_event.queue = queue.queue_id
-            else:
-                alsa_event.queue = queue
-        elif event.queue is None:
-            alsa_event.queue = alsa.SND_SEQ_QUEUE_DIRECT
-        if port is not None:
-            if isinstance(port, SequencerPort):
-                alsa_event.source.port = port.port_id
-            else:
-                alsa_event.source.port = port
-        if dest is not None:
-            dest = SequencerAddress(dest)
-            alsa_event.dest.client = dest.client_id
-            alsa_event.dest.port = dest.port_id
-        elif event.dest is None:
-            alsa_event.dest.client = alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
-        err = alsa.snd_seq_event_output(self.handle, alsa_event)
-        _check_alsa_error(err)
+        result = self._event_output(event, queue, port, dest)
+        _check_alsa_error(result)
+        return result
+
+    def event_output_buffer(self,
+                            event: SequencerEvent,
+                            queue: Union['SequencerQueue', int] = None,
+                            port: Union['SequencerPort', int] = None,
+                            dest: SequencerAddressType = None):
+        self._check_handle()
+        alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
+        result = alsa.snd_seq_event_output(self.handle, alsa_event)
+        _check_alsa_error(result)
+        return result
+
+    def _event_output_direct(self,
+                             event: SequencerEvent,
+                             queue: Union['SequencerQueue', int] = None,
+                             port: Union['SequencerPort', int] = None,
+                             dest: SequencerAddressType = None):
+        alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
+        result = alsa.snd_seq_event_output(self.handle, alsa_event)
+        return result
+
+    def event_output_direct(self,
+                            event: SequencerEvent,
+                            queue: Union['SequencerQueue', int] = None,
+                            port: Union['SequencerPort', int] = None,
+                            dest: SequencerAddressType = None):
+        self._check_handle()
+        result = self._event_output_direct(event, queue, port, dest)
+        _check_alsa_error(result)
+        return result
 
     @overload
     def query_next_client(self, previous: SequencerClientInfo) -> Optional[SequencerClientInfo]:
@@ -380,6 +425,81 @@ class SequencerClient:
             result.sort(key=sort_key)
 
         return result
+
+
+class SequencerClient(SequencerClientBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._read_poll = select.poll()
+        for fd in self._read_fds:
+            self._read_poll.register(fd, select.POLLIN)
+        self._write_poll = select.poll()
+        for fd in self._write_fds:
+            self._write_poll.register(fd, select.POLLOUT)
+
+    def event_input(self, timeout: Optional[float] = None):
+        if timeout:
+            until = time.monotonic() + timeout
+        else:
+            until = None
+
+        while True:
+            result, event = self._event_input()
+            if result != -errno.EAGAIN:
+                break
+            if until is not None:
+                remaining = until - time.monotonic()
+                if remaining <= 0:
+                    return None
+            else:
+                remaining = None
+            self._read_poll.poll(remaining)
+
+        _check_alsa_error(result)
+        return event
+
+    def _event_output_wait(self, func, timeout: Optional[float] = None):
+        if timeout:
+            until = time.monotonic() + timeout
+        else:
+            until = None
+
+        while True:
+            result = func()
+            if result != -errno.EAGAIN:
+                break
+            if until is not None:
+                remaining = until - time.monotonic()
+                if remaining <= 0:
+                    return None
+            else:
+                remaining = None
+            self._write_poll.poll(remaining)
+        _check_alsa_error(result)
+        return result
+
+    def drain_output(self):
+        self._check_handle()
+        func = partial(alsa.snd_seq_drain_output, self.handle)
+        return self._event_output_wait(func)
+
+    def event_output(self,
+                     event: SequencerEvent,
+                     queue: Union['SequencerQueue', int] = None,
+                     port: Union['SequencerPort', int] = None,
+                     dest: SequencerAddressType = None):
+        self._check_handle()
+        func = partial(self._event_output, event, queue, port, dest)
+        return self._event_output_wait(func)
+
+    def event_output_direct(self,
+                            event: SequencerEvent,
+                            queue: Union['SequencerQueue', int] = None,
+                            port: Union['SequencerPort', int] = None,
+                            dest: SequencerAddressType = None):
+        self._check_handle()
+        func = partial(self._event_output_direct, event, queue, port, dest)
+        return self._event_output_wait(func)
 
 
 __all__ = ["SequencerClient", "SequencerClientInfo", "SequencerClientType"]
