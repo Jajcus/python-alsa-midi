@@ -175,7 +175,10 @@ class Event:
             flags = 0
         event.tag = self.tag
         if queue is not None:
-            event.queue = queue
+            if isinstance(queue, int):
+                event.queue = queue
+            else:
+                event.queue = queue.queue_id
         elif self.queue is not None:
             event.queue = self.queue
         else:
