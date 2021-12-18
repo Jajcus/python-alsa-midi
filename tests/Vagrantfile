@@ -3,7 +3,7 @@
 
 $script = <<-'SCRIPT'
   sudo apt update
-  sudo apt install -y python3-cffi python3-venv python3-pip libffi-dev libasound-dev
+  sudo apt install -y python3-cffi python3-venv python3-pip libffi-dev libasound-dev alsa-utils
   export PATH="$PATH:$HOME/.local/bin"
   pip3 install tox
 SCRIPT
