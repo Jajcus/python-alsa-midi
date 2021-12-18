@@ -212,7 +212,7 @@ class SequencerClientBase:
                       event: Event,
                       queue: Union['Queue', int] = None,
                       port: Union['Port', int] = None,
-                      dest: AddressType = None):
+                      dest: AddressType = None) -> int:
         alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
         result = alsa.snd_seq_event_output(self.handle, alsa_event)
         return result
@@ -221,7 +221,7 @@ class SequencerClientBase:
                      event: Event,
                      queue: Union['Queue', int] = None,
                      port: Union['Port', int] = None,
-                     dest: AddressType = None):
+                     dest: AddressType = None) -> int:
         self._check_handle()
         result = self._event_output(event, queue, port, dest)
         _check_alsa_error(result)
@@ -231,7 +231,7 @@ class SequencerClientBase:
                             event: Event,
                             queue: Union['Queue', int] = None,
                             port: Union['Port', int] = None,
-                            dest: AddressType = None):
+                            dest: AddressType = None) -> int:
         self._check_handle()
         alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
         result = alsa.snd_seq_event_output(self.handle, alsa_event)
@@ -242,7 +242,7 @@ class SequencerClientBase:
                              event: Event,
                              queue: Union['Queue', int] = None,
                              port: Union['Port', int] = None,
-                             dest: AddressType = None):
+                             dest: AddressType = None) -> int:
         alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
         result = alsa.snd_seq_event_output(self.handle, alsa_event)
         return result
@@ -251,7 +251,7 @@ class SequencerClientBase:
                             event: Event,
                             queue: Union['Queue', int] = None,
                             port: Union['Port', int] = None,
-                            dest: AddressType = None):
+                            dest: AddressType = None) -> int:
         self._check_handle()
         result = self._event_output_direct(event, queue, port, dest)
         _check_alsa_error(result)
@@ -468,7 +468,15 @@ class SequencerClient(SequencerClientBase):
         _check_alsa_error(result)
         return event
 
-    def _event_output_wait(self, func, timeout: Optional[float] = None):
+    @overload
+    def _event_output_wait(self, func) -> int:
+        ...
+
+    @overload
+    def _event_output_wait(self, func, timeout: float) -> Union[int, None]:
+        ...
+
+    def _event_output_wait(self, func, timeout: Optional[float] = None) -> Union[int, None]:
         if timeout:
             until = time.monotonic() + timeout
         else:
@@ -488,7 +496,7 @@ class SequencerClient(SequencerClientBase):
         _check_alsa_error(result)
         return result
 
-    def drain_output(self):
+    def drain_output(self) -> int:
         self._check_handle()
         func = partial(alsa.snd_seq_drain_output, self.handle)
         return self._event_output_wait(func)
@@ -497,7 +505,7 @@ class SequencerClient(SequencerClientBase):
                      event: Event,
                      queue: Union['Queue', int] = None,
                      port: Union['Port', int] = None,
-                     dest: AddressType = None):
+                     dest: AddressType = None) -> int:
         self._check_handle()
         func = partial(self._event_output, event, queue, port, dest)
         return self._event_output_wait(func)
@@ -506,7 +514,7 @@ class SequencerClient(SequencerClientBase):
                             event: Event,
                             queue: Union['Queue', int] = None,
                             port: Union['Port', int] = None,
-                            dest: AddressType = None):
+                            dest: AddressType = None) -> int:
         self._check_handle()
         func = partial(self._event_output_direct, event, queue, port, dest)
         return self._event_output_wait(func)

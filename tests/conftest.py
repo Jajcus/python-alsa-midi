@@ -2,7 +2,8 @@
 import os
 import re
 import subprocess
-from typing import Dict, List, Tuple
+import sys
+from typing import Dict, List, Optional, Tuple
 
 import pytest
 
@@ -226,18 +227,22 @@ if not alsa_seq_present:
         pass
 
 
-def _check_aplaymidi():
-    try:
-        subprocess.run(["aplaymidi", "--version"], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except (OSError, subprocess.CalledProcessError):
-        return False
-    return True
+def _check_version(tool):
+    def check():
+        try:
+            subprocess.run([tool, "--version"], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.CalledProcessError):
+            return False
+        return True
+    return check
 
 
 tools_present = {}
 tools_checks = {
-        "aplaymidi": _check_aplaymidi,
+        "aplaymidi": _check_version("aplaymidi"),
+        "aseqdump": _check_version("aseqdump"),
+        "stdbuf": _check_version("stdbuf"),
         }
 
 
@@ -276,3 +281,80 @@ def skip_if_no_alsa_or_tool(request):
         if not present:
             pytest.skip(f"Tool {tool!r} not available")
             return
+
+
+@pytest.fixture
+@pytest.mark.require_tool("stdbuf")
+@pytest.mark.require_tool("aseqdump")
+def aseqdump():
+    from threading import Thread
+
+    from alsa_midi import Address
+
+    class Aseqdump:
+        process: Optional[subprocess.Popen]
+        output: List[Tuple[Address, str]]
+        port: Address
+
+        def __init__(self, process: subprocess.Popen):
+            self.process = process
+            self.output = []
+            self.read_header()
+            self.thread = Thread(name=f"aseqdump-{process.pid}",
+                                 target=self.read_output,
+                                 daemon=True)
+            self.thread.start()
+
+        def read_header(self):
+            assert self.process is not None
+            assert self.process.stdout is not None
+            line = self.process.stdout.readline().decode()
+            match = re.search(r" at port (\d+:\d+)\D", line)
+            assert match is not None
+            self.port = Address(match.group(1))
+
+        def __del__(self):
+            if self.process:
+                self.close()
+
+        def close(self):
+            process = self.process
+            if process:
+                self.process = None
+                process.terminate()
+
+        def read_output(self):
+            try:
+                while True:
+                    process = self.process
+                    if process is None:
+                        break
+                    assert process.stdout is not None
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+                    line = line.decode()
+                    line = line.strip()
+                    addr = line.split(None, 1)[0]
+                    if addr == "Source":
+                        # header
+                        continue
+                    try:
+                        addr = Address(addr)
+                    except ValueError:
+                        print(f"Unexpected aseqdump output: {line!r}", file=sys.stderr)
+                        continue
+                    self.output.append((addr, line))
+            except Exception as exc:
+                print("read_output thread exception:", exc, file=sys.stderr)
+            finally:
+                process = self.process
+                if process is not None and process.stdout is not None:
+                    process.stdout.close()
+
+    process = subprocess.Popen(["stdbuf", "-o", "L", "aseqdump"],
+                               bufsize=0,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL,
+                               stdin=subprocess.DEVNULL)
+    return Aseqdump(process)
