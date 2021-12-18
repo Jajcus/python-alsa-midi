@@ -310,7 +310,7 @@ def aseqdump():
             assert self.process.stdout is not None
             line = self.process.stdout.readline().decode()
             match = re.search(r" at port (\d+:\d+)\D", line)
-            assert match is not None
+            assert match is not None, f"Unexpected aseqdump output: {line!r}"
             self.port = Address(match.group(1))
 
         def __del__(self):
