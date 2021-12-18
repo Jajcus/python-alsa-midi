@@ -258,6 +258,18 @@ def pytest_configure(config):
     )
 
 
+def check_tool(tool):
+    if tool in tools_present:
+        present = tools_present[tool]
+    else:
+        present = tools_checks[tool]()
+        tools_present[tool] = present
+    if not present:
+        pytest.skip(f"Tool {tool!r} not available")
+        return False
+    return True
+
+
 @pytest.fixture(autouse=True)
 def skip_if_no_alsa_or_tool(request):
     marker = request.node.get_closest_marker("require_alsa_seq")
@@ -273,20 +285,16 @@ def skip_if_no_alsa_or_tool(request):
     marker = request.node.get_closest_marker("require_tool")
     if marker:
         tool = marker.args[0]
-        if tool in tools_present:
-            present = tools_present[tool]
-        else:
-            present = tools_checks[tool]()
-            tools_present[tool] = present
-        if not present:
-            pytest.skip(f"Tool {tool!r} not available")
+        if not check_tool(tool):
             return
 
 
 @pytest.fixture
-@pytest.mark.require_tool("stdbuf")
-@pytest.mark.require_tool("aseqdump")
 def aseqdump():
+
+    check_tool("stdbuf")
+    check_tool("aseqdump")
+
     from threading import Thread
 
     from alsa_midi import Address
