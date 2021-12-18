@@ -2,15 +2,15 @@
 from typing import TYPE_CHECKING
 
 from ._ffi import alsa, ffi
-from .event import SequencerEventType
-from .exceptions import SequencerError, SequencerStateError
+from .event import EventType
+from .exceptions import Error, StateError
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
     from .client import SequencerClientBase, _snd_seq_t
 
 
-class SequencerQueue:
+class Queue:
     def __init__(self, client: 'SequencerClientBase', queue_id: int):
         self.client = client
         self.queue_id = queue_id
@@ -18,15 +18,15 @@ class SequencerQueue:
     def __del__(self):
         try:
             self.close()
-        except SequencerError:
+        except Error:
             pass
 
     def _get_client_handle(self) -> '_snd_seq_t':
         if self.client is None:
-            raise SequencerStateError("Already closed")
+            raise StateError("Already closed")
         handle = self.client.handle
         if handle is None:
-            raise SequencerStateError("Sequencer already closed")
+            raise StateError("Sequencer already closed")
         return handle
 
     def close(self):
@@ -53,19 +53,19 @@ class SequencerQueue:
         finally:
             alsa.snd_seq_queue_tempo_free(q_tempo[0])
 
-    def control(self, event_type: SequencerEventType, value: int = 0):
+    def control(self, event_type: EventType, value: int = 0):
         handle = self._get_client_handle()
         err = alsa.snd_seq_control_queue(handle, self.queue_id, event_type, value, ffi.NULL)
         _check_alsa_error(err)
 
     def start(self):
-        return self.control(SequencerEventType.START)
+        return self.control(EventType.START)
 
     def stop(self):
-        return self.control(SequencerEventType.STOP)
+        return self.control(EventType.STOP)
 
     def continue_(self):
-        return self.control(SequencerEventType.CONTINUE)
+        return self.control(EventType.CONTINUE)
 
 
-__all__ = ["SequencerQueue"]
+__all__ = ["Queue"]

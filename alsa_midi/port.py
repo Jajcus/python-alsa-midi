@@ -3,15 +3,15 @@ from enum import IntFlag
 from typing import TYPE_CHECKING, List, NewType, Optional, Tuple
 
 from ._ffi import alsa, ffi
-from .address import SequencerAddress, SequencerAddressType
-from .exceptions import SequencerError, SequencerStateError
+from .address import Address, AddressType
+from .exceptions import Error, StateError
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
-    from .client import SequencerClientBase, _snd_seq_t
+    from .client import SequencerBase, _snd_seq_t
 
 
-class SequencerPortCaps(IntFlag):
+class PortCaps(IntFlag):
     _NONE = 0
     READ = alsa.SND_SEQ_PORT_CAP_READ
     WRITE = alsa.SND_SEQ_PORT_CAP_WRITE
@@ -23,7 +23,7 @@ class SequencerPortCaps(IntFlag):
     NO_EXPORT = alsa.SND_SEQ_PORT_CAP_NO_EXPORT
 
 
-class SequencerPortType(IntFlag):
+class PortType(IntFlag):
     ANY = 0
     SPECIFIC = alsa.SND_SEQ_PORT_TYPE_SPECIFIC
     MIDI_GENERIC = alsa.SND_SEQ_PORT_TYPE_MIDI_GENERIC
@@ -42,32 +42,32 @@ class SequencerPortType(IntFlag):
     APPLICATION = alsa.SND_SEQ_PORT_TYPE_APPLICATION
 
 
-READ_PORT = SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
-WRITE_PORT = SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
+READ_PORT = PortCaps.READ | PortCaps.SUBS_READ
+WRITE_PORT = PortCaps.WRITE | PortCaps.SUBS_WRITE
 RW_PORT = READ_PORT | WRITE_PORT
 
 READ_PORT_PREFERRED_TYPES = [
-        SequencerPortType.MIDI_GENERIC
+        PortType.MIDI_GENERIC
         ]
 
 RW_PORT_PREFERRED_TYPES = READ_PORT_PREFERRED_TYPES
 
 WRITE_PORT_PREFERRED_TYPES = [
-        SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM
-        | SequencerPortType.SYNTHESIZER,
-        SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER,
-        SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM,
-        SequencerPortType.MIDI_GENERIC
+        PortType.MIDI_GENERIC | PortType.MIDI_GM
+        | PortType.SYNTHESIZER,
+        PortType.MIDI_GENERIC | PortType.SYNTHESIZER,
+        PortType.MIDI_GENERIC | PortType.MIDI_GM,
+        PortType.MIDI_GENERIC
         ]
 
-DEFAULT_PORT_TYPE = SequencerPortType.MIDI_GENERIC | SequencerPortType.SOFTWARE
+DEFAULT_PORT_TYPE = PortType.MIDI_GENERIC | PortType.SOFTWARE
 
 
-class SequencerPort:
+class Port:
     client_id: int
     port_id: int
 
-    def __init__(self, client: 'SequencerClientBase', port_id: int):
+    def __init__(self, client: 'SequencerBase', port_id: int):
         self.client_id = client.client_id
         self.port_id = port_id
         self.client = client
@@ -75,15 +75,15 @@ class SequencerPort:
     def __del__(self):
         try:
             self.close()
-        except SequencerError:
+        except Error:
             pass
 
     def _get_client_handle(self) -> '_snd_seq_t':
         if self.client is None:
-            raise SequencerStateError("Already closed")
+            raise StateError("Already closed")
         handle = self.client.handle
         if handle is None:
-            raise SequencerStateError("Sequencer already closed")
+            raise StateError("Sequencer already closed")
         return handle
 
     def close(self):
@@ -96,26 +96,26 @@ class SequencerPort:
             err = alsa.snd_seq_delete_simple_port(handle, port_id)
             _check_alsa_error(err)
 
-    def connect_to(self, dest: SequencerAddressType):
-        client_id, port_id = SequencerAddress(dest)
+    def connect_to(self, dest: AddressType):
+        client_id, port_id = Address(dest)
         handle = self._get_client_handle()
         err = alsa.snd_seq_connect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
-    def disconnect_to(self, dest: SequencerAddressType):
-        client_id, port_id = SequencerAddress(dest)
+    def disconnect_to(self, dest: AddressType):
+        client_id, port_id = Address(dest)
         handle = self._get_client_handle()
         err = alsa.snd_seq_disconnect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
-    def connect_from(self, src: SequencerAddressType):
-        client_id, port_id = SequencerAddress(src)
+    def connect_from(self, src: AddressType):
+        client_id, port_id = Address(src)
         handle = self._get_client_handle()
         err = alsa.snd_seq_connect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
-    def disconnect_from(self, src: SequencerAddressType):
-        client_id, port_id = SequencerAddress(src)
+    def disconnect_from(self, src: AddressType):
+        client_id, port_id = Address(src)
         handle = self._get_client_handle()
         err = alsa.snd_seq_disconnect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
@@ -125,12 +125,12 @@ _snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)
 _snd_seq_port_info_t_p = NewType("_snd_seq_port_info_t", Tuple[_snd_seq_port_info_t])
 
 
-class SequencerPortInfo:
+class PortInfo:
     client_id: int
     port_id: int
     name: str
-    capability: SequencerPortCaps
-    type: SequencerPortType
+    capability: PortCaps
+    type: PortType
     midi_channels: int
     midi_voices: int
     synth_voices: int
@@ -147,8 +147,8 @@ class SequencerPortInfo:
                  client_id: int,
                  port_id: int = None,
                  name: str = None,
-                 capability: SequencerPortCaps = SequencerPortCaps._NONE,
-                 type: SequencerPortType = SequencerPortType.ANY,
+                 capability: PortCaps = PortCaps._NONE,
+                 type: PortType = PortType.ANY,
                  midi_channels: int = 0,
                  midi_voices: int = 0,
                  synth_voices: int = 0,
@@ -194,8 +194,8 @@ class SequencerPortInfo:
                 client_id=alsa.snd_seq_port_info_get_client(info),
                 port_id=alsa.snd_seq_port_info_get_port(info),
                 name=name.decode(),
-                capability=SequencerPortCaps(caps),
-                type=SequencerPortType(p_type),
+                capability=PortCaps(caps),
+                type=PortType(p_type),
                 midi_channels=alsa.snd_seq_port_info_get_midi_channels(info),
                 midi_voices=alsa.snd_seq_port_info_get_midi_voices(info),
                 synth_voices=alsa.snd_seq_port_info_get_synth_voices(info),
@@ -227,8 +227,8 @@ class SequencerPortInfo:
         return info
 
 
-def get_port_info_sort_key(preferred_types: List[SequencerPortType] = []):
-    def key(info: SequencerPortInfo):
+def get_port_info_sort_key(preferred_types: List[PortType] = []):
+    def key(info: PortInfo):
         is_midi_through = info.client_name == "Midi Through"
         preference = len(preferred_types)
         for i, types in enumerate(preferred_types):
@@ -239,7 +239,7 @@ def get_port_info_sort_key(preferred_types: List[SequencerPortType] = []):
     return key
 
 
-__all__ = ["SequencerPortCaps", "SequencerPortType", "SequencerPort",
+__all__ = ["PortCaps", "PortType", "Port",
            "READ_PORT", "WRITE_PORT", "RW_PORT", "DEFAULT_PORT_TYPE",
            "READ_PORT_PREFERRED_TYPES", "WRITE_PORT_PREFERRED_TYPES", "RW_PORT_PREFERRED_TYPES",
-           "SequencerPortInfo"]
+           "PortInfo"]

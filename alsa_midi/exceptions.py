@@ -1,17 +1,17 @@
 """Exceptions raised by the alsa-midi modules."""
 
 
-class SequencerError(Exception):
+class Error(Exception):
     pass
 
 
-class SequencerStateError(SequencerError):
+class StateError(Error):
     pass
 
 
-class SequencerALSAError(SequencerError):
+class ALSAError(Error):
     def __init__(self, message, errnum):
-        SequencerError.__init__(self, message, errnum)
+        Error.__init__(self, message, errnum)
         self.message = message
         self.errnum = errnum
 
@@ -19,4 +19,4 @@ class SequencerALSAError(SequencerError):
         return self.message
 
 
-__all__ = ["SequencerError", "SequencerStateError", "SequencerALSAError"]
+__all__ = ["Error", "StateError", "ALSAError"]

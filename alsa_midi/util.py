@@ -1,6 +1,6 @@
 
 from ._ffi import alsa, ffi
-from .exceptions import SequencerALSAError
+from .exceptions import ALSAError
 
 
 def _check_alsa_error(code):
@@ -8,7 +8,7 @@ def _check_alsa_error(code):
         raise TypeError("ALSA error code must be an int")
     if code < 0:
         message = ffi.string(alsa.snd_strerror(code))
-        raise SequencerALSAError(message.decode(), code)
+        raise ALSAError(message.decode(), code)
 
 
 def _ensure_4bit(value):

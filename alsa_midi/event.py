@@ -3,15 +3,15 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Any, NewType, Optional, Tuple, Union
 
 from ._ffi import alsa, ffi
-from .address import SequencerAddress, SequencerAddressType
+from .address import Address, AddressType
 from .util import _ensure_4bit, _ensure_7bit
 
 if TYPE_CHECKING:
-    from .port import SequencerPort
-    from .queue import SequencerQueue
+    from .port import Port
+    from .queue import Queue
 
 
-class SequencerEventType(IntEnum):
+class EventType(IntEnum):
     SYSTEM = alsa.SND_SEQ_EVENT_SYSTEM
     RESULT = alsa.SND_SEQ_EVENT_RESULT
     NOTE = alsa.SND_SEQ_EVENT_NOTE
@@ -83,12 +83,12 @@ class SequencerEventType(IntEnum):
 _snd_seq_event_t = NewType("_snd_seq_event_t", Any)
 
 
-class SequencerEvent:
+class Event:
     _specialized = {}
     type = None
 
     def __init__(self,
-                 type: SequencerEventType,
+                 type: EventType,
                  *,
                  flags: Optional[int] = 0,
                  tag: int = 0,
@@ -116,11 +116,11 @@ class SequencerEvent:
         self.relative = relative
 
         if source is not None:
-            self.source = SequencerAddress(*source)
+            self.source = Address(*source)
         else:
             self.source = None
         if dest is not None:
-            self.dest = SequencerAddress(*dest)
+            self.dest = Address(*dest)
         else:
             self.dest = None
 
@@ -149,22 +149,22 @@ class SequencerEvent:
         relative = (flags & alsa.SND_SEQ_TIME_MODE_MASK) == alsa.SND_SEQ_TIME_MODE_REL
         raw_data = bytes(ffi.buffer(ffi.addressof(event.data)))
         if cls.type is None:
-            kwargs["type"] = SequencerEventType(event.type)
+            kwargs["type"] = EventType(event.type)
         return cls(flags=flags,
                    tag=event.flags,
                    queue=event.queue,
                    time=ev_time,
                    tick=ev_tick,
                    relative=relative,
-                   source=SequencerAddress(event.source.client, event.source.port),
-                   dest=SequencerAddress(event.dest.client, event.dest.port),
+                   source=Address(event.source.client, event.source.port),
+                   dest=Address(event.dest.client, event.dest.port),
                    raw_data=raw_data,
                    **kwargs)
 
     def _to_alsa(self, *,
-                 queue: Union['SequencerQueue', int] = None,
-                 port: Union['SequencerPort', int] = None,
-                 dest: SequencerAddressType = None
+                 queue: Union['Queue', int] = None,
+                 port: Union['Port', int] = None,
+                 dest: AddressType = None
                  ) -> _snd_seq_event_t:
         event: _snd_seq_event_t = ffi.new("snd_seq_event_t *")
         assert self.type is not None
@@ -202,7 +202,7 @@ class SequencerEvent:
             event.source.client = self.source.client_id
             event.source.port = self.source.port_id
         if dest is not None:
-            client_id, port_id = SequencerAddress(dest)
+            client_id, port_id = Address(dest)
             event.dest.client = client_id
             event.dest.port = port_id
         elif self.dest is not None:
@@ -211,7 +211,7 @@ class SequencerEvent:
         else:
             event.dest.client = alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
 
-        if self.__class__ == SequencerEvent and self.raw_data is not None:
+        if self.__class__ == Event and self.raw_data is not None:
             # not for subclasses:
             # set raw data
             buf = ffi.buffer(ffi.addressof(event.data))
@@ -225,12 +225,12 @@ class SequencerEvent:
 def _specialized_event_class(event_type):
     def decorator(cls):
         cls.type = event_type
-        SequencerEvent._specialized[event_type.value] = cls
+        Event._specialized[event_type.value] = cls
         return cls
     return decorator
 
 
-class SequencerNoteEventBase(SequencerEvent):
+class NoteEventBase(Event):
     def __init__(self,
                  note: int,
                  channel: int = 0,
@@ -261,8 +261,8 @@ class SequencerNoteEventBase(SequencerEvent):
         return event
 
 
-@_specialized_event_class(SequencerEventType.NOTE)
-class SequencerNoteEvent(SequencerNoteEventBase):
+@_specialized_event_class(EventType.NOTE)
+class NoteEvent(NoteEventBase):
     def __init__(self,
                  note: int,
                  channel: int = 0,
@@ -292,18 +292,18 @@ class SequencerNoteEvent(SequencerNoteEventBase):
         return event
 
 
-@_specialized_event_class(SequencerEventType.NOTEON)
-class SequencerNoteOnEvent(SequencerNoteEventBase):
+@_specialized_event_class(EventType.NOTEON)
+class NoteOnEvent(NoteEventBase):
     pass
 
 
-@_specialized_event_class(SequencerEventType.NOTEOFF)
-class SequencerNoteOffEvent(SequencerNoteEventBase):
+@_specialized_event_class(EventType.NOTEOFF)
+class NoteOffEvent(NoteEventBase):
     pass
 
 
 __all__ = [
-        "SequencerEventType", "SequencerEvent",
-        "SequencerNoteEventBase",
-        "SequencerNoteOnEvent", "SequencerNoteOffEvent"
+        "EventType", "Event",
+        "NoteEventBase",
+        "NoteOnEvent", "NoteOffEvent"
         ]

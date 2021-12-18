@@ -5,11 +5,10 @@ import time
 
 import pytest
 
-from alsa_midi import (WRITE_PORT, SequencerAddress, SequencerALSAError, SequencerClient,
-                       SequencerClientInfo, SequencerClientType, SequencerEvent, SequencerPortCaps,
-                       SequencerPortType, SequencerStateError, alsa, ffi)
+from alsa_midi import (WRITE_PORT, Address, ALSAError, ClientInfo, ClientType, Event, PortCaps,
+                       PortType, SequencerClient, StateError, alsa, ffi)
 from alsa_midi.client import SequencerClientBase
-from alsa_midi.port import SequencerPortInfo
+from alsa_midi.port import PortInfo
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(TESTS_DIR, "data")
@@ -17,7 +16,7 @@ DATA_DIR = os.path.join(TESTS_DIR, "data")
 
 @pytest.mark.require_no_alsa_seq
 def test_client_open_fail():
-    with pytest.raises(SequencerALSAError):
+    with pytest.raises(ALSAError):
         SequencerClient("test")
 
 
@@ -32,7 +31,7 @@ def test_client_open_close():
     assert client.handle is None
     assert client._handle_p is None
 
-    with pytest.raises(SequencerStateError):
+    with pytest.raises(StateError):
         client.drain_output()
 
     # another close should not change anything
@@ -86,8 +85,7 @@ def test_client_drop_output_nothing():
 def test_client_info():
 
     # test defaults
-    info = SequencerClientInfo(client_id=11,
-                               name="client_info_test")
+    info = ClientInfo(client_id=11, name="client_info_test")
 
     assert info.client_id == 11
     assert info.name == "client_info_test"
@@ -100,31 +98,31 @@ def test_client_info():
     assert info.event_lost == 0
 
     # test initializing all attributes
-    info = SequencerClientInfo(client_id=15,
-                               name="client_info_test2",
-                               broadcast_filter=True,
-                               error_bounce=True,
-                               type=SequencerClientType.KERNEL,
-                               card_id=8,
-                               pid=100,
-                               num_ports=5,
-                               event_lost=7)
+    info = ClientInfo(client_id=15,
+                      name="client_info_test2",
+                      broadcast_filter=True,
+                      error_bounce=True,
+                      type=ClientType.KERNEL,
+                      card_id=8,
+                      pid=100,
+                      num_ports=5,
+                      event_lost=7)
 
     assert info.client_id == 15
     assert info.name == "client_info_test2"
     assert info.broadcast_filter is True
     assert info.error_bounce is True
-    assert info.type == SequencerClientType.KERNEL
+    assert info.type == ClientType.KERNEL
     assert info.card_id == 8
     assert info.pid == 100
     assert info.num_ports == 5
     assert info.event_lost == 7
 
     # test _to_alsa (only some values are writable to the ALSA struct)
-    info = SequencerClientInfo(client_id=17,
-                               name="client_info_test3",
-                               broadcast_filter=True,
-                               error_bounce=False)
+    info = ClientInfo(client_id=17,
+                      name="client_info_test3",
+                      broadcast_filter=True,
+                      error_bounce=False)
 
     assert info.client_id == 17
     assert info.name == "client_info_test3"
@@ -146,13 +144,13 @@ def test_client_info():
     alsa.snd_seq_client_info_set_name(alsa_info, b"client_info_test4")
     alsa.snd_seq_client_info_set_broadcast_filter(alsa_info, 1)
     alsa.snd_seq_client_info_set_error_bounce(alsa_info, 1)
-    info = SequencerClientInfo._from_alsa(alsa_info)
+    info = ClientInfo._from_alsa(alsa_info)
 
     assert info.client_id == 44
     assert info.name == "client_info_test4"
     assert info.broadcast_filter is True
     assert info.error_bounce is True
-    assert info.type == SequencerClientType._UNSET
+    assert info.type == ClientType._UNSET
 
 
 @pytest.mark.require_alsa_seq
@@ -216,10 +214,10 @@ def test_query_next_port(alsa_seq_state):
         assert info.client_id == alsa_port.client_id
         assert info.name == alsa_port.name
 
-        assert (SequencerPortCaps.WRITE in info.capability) == ("w" in alsa_port.flags.lower())
-        assert (SequencerPortCaps.SUBS_WRITE in info.capability) == ("W" in alsa_port.flags)
-        assert (SequencerPortCaps.READ in info.capability) == ("r" in alsa_port.flags.lower())
-        assert (SequencerPortCaps.SUBS_READ in info.capability) == ("R" in alsa_port.flags)
+        assert (PortCaps.WRITE in info.capability) == ("w" in alsa_port.flags.lower())
+        assert (PortCaps.SUBS_WRITE in info.capability) == ("W" in alsa_port.flags)
+        assert (PortCaps.READ in info.capability) == ("r" in alsa_port.flags.lower())
+        assert (PortCaps.SUBS_READ in info.capability) == ("R" in alsa_port.flags)
 
         assert info.read_use == len(alsa_port.connected_to)
         assert info.write_use == len(alsa_port.connected_from)
@@ -244,7 +242,7 @@ def test_list_ports(alsa_seq_state):
     ports = client.list_ports()
 
     for port in ports:
-        assert isinstance(port, SequencerPortInfo)
+        assert isinstance(port, PortInfo)
 
     alsa_ports = []
     for alsa_port in alsa_seq_state.ports.values():
@@ -267,43 +265,43 @@ def test_list_ports(alsa_seq_state):
     other_c1 = SequencerClient("other_client1")
     input_port = other_c1.create_port(
             "in",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ)
+            PortCaps.READ | PortCaps.SUBS_READ)
     input_port_a = (input_port.client_id, input_port.port_id)
     output_port = other_c1.create_port(
             "out",
-            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE)
+            PortCaps.WRITE | PortCaps.SUBS_WRITE)
     output_port_a = (output_port.client_id, output_port.port_id)
     inout_port = other_c1.create_port(
             "inout",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
-            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE)
+            PortCaps.READ | PortCaps.SUBS_READ
+            | PortCaps.WRITE | PortCaps.SUBS_WRITE)
     inout_port_a = (inout_port.client_id, inout_port.port_id)
     s_inout_port = other_c1.create_port(
             "inout",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
-            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-            SequencerPortType.SPECIFIC)
+            PortCaps.READ | PortCaps.SUBS_READ
+            | PortCaps.WRITE | PortCaps.SUBS_WRITE,
+            PortType.SPECIFIC)
     s_inout_port_a = (s_inout_port.client_id, s_inout_port.port_id)
 
     # a client with a set of unconnectable or noexport ports
     other_c2 = SequencerClient("other_client2")
     input_port_nc = other_c2.create_port(
             "in",
-            SequencerPortCaps.READ)
+            PortCaps.READ)
     input_port_nc_a = (input_port_nc.client_id, input_port_nc.port_id)
     output_port_nc = other_c2.create_port(
             "out",
-            SequencerPortCaps.WRITE)
+            PortCaps.WRITE)
     output_port_nc_a = (output_port_nc.client_id, output_port_nc.port_id)
     inout_port_nc = other_c2.create_port(
             "inout",
-            SequencerPortCaps.READ | SequencerPortCaps.WRITE)
+            PortCaps.READ | PortCaps.WRITE)
     inout_port_nc_a = (inout_port_nc.client_id, inout_port_nc.port_id)
     inout_port_ne = other_c2.create_port(
             "inout",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
-            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
-            | SequencerPortCaps.NO_EXPORT)
+            PortCaps.READ | PortCaps.SUBS_READ
+            | PortCaps.WRITE | PortCaps.SUBS_WRITE
+            | PortCaps.NO_EXPORT)
     inout_port_ne_a = (inout_port_ne.client_id, inout_port_ne.port_id)
 
     # test input=True
@@ -347,7 +345,7 @@ def test_list_ports(alsa_seq_state):
     assert s_inout_port_a not in port_addrs
 
     # test include_system=True
-    ports = client.list_ports(include_system=True, type=SequencerPortType.ANY)
+    ports = client.list_ports(include_system=True, type=PortType.ANY)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     client_names = {p.client_name for p in ports}
     if "Midi Through" in alsa_client_names:
@@ -363,7 +361,7 @@ def test_list_ports(alsa_seq_state):
     assert inout_port_ne_a in port_addrs
 
     # test include_system=False
-    ports = client.list_ports(include_system=False, type=SequencerPortType.ANY)
+    ports = client.list_ports(include_system=False, type=PortType.ANY)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     client_names = {p.client_name for p in ports}
     if "Midi Through" in alsa_client_names:
@@ -463,8 +461,8 @@ def test_list_ports(alsa_seq_state):
     assert inout_port_ne_a in port_addrs
     assert s_inout_port_a not in port_addrs
 
-    # test type=SequencerPortType.SPECIFIC
-    ports = client.list_ports(type=SequencerPortType.SPECIFIC)
+    # test type=PortType.SPECIFIC
+    ports = client.list_ports(type=PortType.SPECIFIC)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     assert input_port_a not in port_addrs
     assert output_port_a not in port_addrs
@@ -488,10 +486,10 @@ def test_list_ports_sorting(alsa_seq_state):
     # test defaults
     alsa_seq_state.load()
     alsa_client_names = [client.name for client in alsa_seq_state.clients.values()]
-    ports = client.list_ports(type=SequencerPortType.ANY)
+    ports = client.list_ports(type=PortType.ANY)
 
     for port in ports:
-        assert isinstance(port, SequencerPortInfo)
+        assert isinstance(port, PortInfo)
 
     # MIDI Through goes last
     if "Midi Through" in alsa_client_names:
@@ -500,61 +498,61 @@ def test_list_ports_sorting(alsa_seq_state):
     other_c1 = SequencerClient("other_client1")
     specific_inout = other_c1.create_port(
             "spec inout",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
-            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-            SequencerPortType.SPECIFIC)
+            PortCaps.READ | PortCaps.SUBS_READ
+            | PortCaps.WRITE | PortCaps.SUBS_WRITE,
+            PortType.SPECIFIC)
     specific_inout_a = (specific_inout.client_id, specific_inout.port_id)
     midi_generic_input = other_c1.create_port(
             "in",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ,
-            SequencerPortType.MIDI_GENERIC)
+            PortCaps.READ | PortCaps.SUBS_READ,
+            PortType.MIDI_GENERIC)
     midi_generic_input_a = (midi_generic_input.client_id, midi_generic_input.port_id)
     midi_generic_output = other_c1.create_port(
             "out",
-            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-            SequencerPortType.MIDI_GENERIC)
+            PortCaps.WRITE | PortCaps.SUBS_WRITE,
+            PortType.MIDI_GENERIC)
     midi_generic_output_a = (midi_generic_output.client_id, midi_generic_output.port_id)
     midi_generic_inout = other_c1.create_port(
             "inout",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
-            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-            SequencerPortType.MIDI_GENERIC)
+            PortCaps.READ | PortCaps.SUBS_READ
+            | PortCaps.WRITE | PortCaps.SUBS_WRITE,
+            PortType.MIDI_GENERIC)
     midi_generic_inout_a = (midi_generic_inout.client_id, midi_generic_inout.port_id)
 
     other_c2 = SequencerClient("other_client2")
     midi_gm_input = other_c2.create_port(
             "GM in",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ,
-            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
+            PortCaps.READ | PortCaps.SUBS_READ,
+            PortType.MIDI_GENERIC | PortType.MIDI_GM)
     midi_gm_input_a = (midi_gm_input.client_id, midi_gm_input.port_id)
     midi_gm_output = other_c2.create_port(
             "GM out",
-            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
+            PortCaps.WRITE | PortCaps.SUBS_WRITE,
+            PortType.MIDI_GENERIC | PortType.MIDI_GM)
     midi_gm_output_a = (midi_gm_output.client_id, midi_gm_output.port_id)
     midi_gm_inout = other_c2.create_port(
             "GM inout",
-            SequencerPortCaps.READ | SequencerPortCaps.SUBS_READ
-            | SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
+            PortCaps.READ | PortCaps.SUBS_READ
+            | PortCaps.WRITE | PortCaps.SUBS_WRITE,
+            PortType.MIDI_GENERIC | PortType.MIDI_GM)
     midi_gm_inout_a = (midi_gm_inout.client_id, midi_gm_inout.port_id)
     midi_synth_out = other_c2.create_port(
             "GM Synth out",
-            SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-            SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM
-            | SequencerPortType.SYNTHESIZER)
+            PortCaps.WRITE | PortCaps.SUBS_WRITE,
+            PortType.MIDI_GENERIC | PortType.MIDI_GM
+            | PortType.SYNTHESIZER)
     midi_synth_out_a = (midi_synth_out.client_id, midi_synth_out.port_id)
 
     # no sorting -> order by client_id, port_id
     ports = client.list_ports(only_connectable=False, include_system=True, sort=False,
-                              type=SequencerPortType.ANY)
+                              type=PortType.ANY)
     port_addrs = [(p.client_id, p.port_id) for p in ports]
     for i in range(0, len(port_addrs) - 1):
         assert port_addrs[i] < port_addrs[i + 1]
 
     # default sorting
     ports = client.list_ports(only_connectable=False, include_system=True,
-                              type=SequencerPortType.ANY)
+                              type=PortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 
     assert pa.index(specific_inout_a) > pa.index(midi_generic_input_a)
@@ -570,7 +568,7 @@ def test_list_ports_sorting(alsa_seq_state):
 
     # default input port sorting
     ports = client.list_ports(only_connectable=False, include_system=True, input=True,
-                              type=SequencerPortType.ANY)
+                              type=PortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 
     assert pa.index(specific_inout_a) > pa.index(midi_generic_input_a)
@@ -583,7 +581,7 @@ def test_list_ports_sorting(alsa_seq_state):
 
     # default output port sorting
     ports = client.list_ports(only_connectable=False, include_system=True, output=True,
-                              type=SequencerPortType.ANY)
+                              type=PortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 
     assert pa.index(specific_inout_a) > pa.index(midi_generic_output_a)
@@ -613,7 +611,7 @@ def test_event_input():
     client.drop_input()
 
     # should faile with EAGAIN
-    with pytest.raises(SequencerALSAError):
+    with pytest.raises(ALSAError):
         SequencerClientBase.event_input(client)
 
     # shoul block for 0.5s
@@ -624,13 +622,13 @@ def test_event_input():
 
     # play a midi file to our port
     filename = os.path.join(DATA_DIR, "test-c-major-scale-fast.mid")
-    cmd = ["aplaymidi", "-p", str(SequencerAddress(port)), "-d", "0", filename]
+    cmd = ["aplaymidi", "-p", str(Address(port)), "-d", "0", filename]
     player = subprocess.Popen(cmd)
 
     events = []
     for _ in range(18):
         event = client.event_input(timeout=1)
-        assert isinstance(event, SequencerEvent)
+        assert isinstance(event, Event)
         events.append(event)
 
     # shoul block for 0.5s (no more events)

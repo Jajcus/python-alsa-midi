@@ -2,7 +2,7 @@
 
 import pytest
 
-from alsa_midi import SequencerClient, SequencerQueue
+from alsa_midi import Queue, SequencerClient
 
 
 @pytest.mark.require_alsa_seq
@@ -10,7 +10,7 @@ def test_queue_create_close():
     client = SequencerClient("test_c")
     queue = client.create_queue()
 
-    assert isinstance(queue, SequencerQueue)
+    assert isinstance(queue, Queue)
     assert queue.client is client
 
     queue.close()
@@ -26,7 +26,7 @@ def test_queue_create_del():
     client = SequencerClient("test_c")
     queue = client.create_queue()
 
-    assert isinstance(queue, SequencerQueue)
+    assert isinstance(queue, Queue)
     assert queue.client is client
 
     del queue

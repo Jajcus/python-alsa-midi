@@ -1,23 +1,21 @@
 """Python interface to ALSA MIDI Sequencer."""
 
 from ._ffi import alsa, ffi
-from .address import ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER, SequencerAddress
-from .client import SequencerClient, SequencerClientInfo, SequencerClientType
-from .event import (SequencerEvent, SequencerEventType, SequencerNoteEventBase,
-                    SequencerNoteOffEvent, SequencerNoteOnEvent)
-from .exceptions import SequencerALSAError, SequencerError, SequencerStateError
-from .port import (READ_PORT, RW_PORT, WRITE_PORT, SequencerPort, SequencerPortCaps,
-                   SequencerPortInfo, SequencerPortType)
-from .queue import SequencerQueue
+from .address import ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER, Address
+from .client import ClientInfo, ClientType, SequencerClient
+from .event import Event, EventType, NoteEventBase, NoteOffEvent, NoteOnEvent
+from .exceptions import ALSAError, Error, StateError
+from .port import READ_PORT, RW_PORT, WRITE_PORT, Port, PortCaps, PortInfo, PortType
+from .queue import Queue
 
 __all__ = [
-        "SequencerAddress", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE",
-        "SequencerClient", "SequencerClientInfo", "SequencerClientType",
-        "SequencerEventType", "SequencerEvent", "SequencerNoteEventBase", "SequencerNoteOnEvent",
-        "SequencerNoteOffEvent",
-        "SequencerError", "SequencerStateError", "SequencerALSAError",
-        "SequencerPort", "SequencerPortCaps", "SequencerPortType", "SequencerPortInfo",
+        "Address", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE",
+        "SequencerClient", "ClientInfo", "ClientType",
+        "EventType", "Event", "NoteEventBase", "NoteOnEvent",
+        "NoteOffEvent",
+        "Error", "StateError", "ALSAError",
+        "Port", "PortCaps", "PortType", "PortInfo",
         "READ_PORT", "WRITE_PORT", "RW_PORT",
-        "SequencerQueue",
+        "Queue",
         "alsa", "ffi",
         ]

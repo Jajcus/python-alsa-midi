@@ -3,7 +3,7 @@
 import re
 from argparse import ArgumentParser, ArgumentTypeError
 
-from alsa_midi import SequencerClient, SequencerPortType
+from alsa_midi import PortType, SequencerClient
 
 
 def flag_parser(flag_type):
@@ -30,8 +30,8 @@ def main():
                         help="Show input ports")
     parser.add_argument("--output", action="store_true",
                         help="Show output ports")
-    parser.add_argument("--type", type=flag_parser(SequencerPortType),
-                        default=SequencerPortType.MIDI_GENERIC,
+    parser.add_argument("--type", type=flag_parser(PortType),
+                        default=PortType.MIDI_GENERIC,
                         help="Show only ports of this type (default: MIDI_GENERIC)")
     parser.add_argument("--system", action="store_true", default=False,
                         help="Include system ports")

@@ -7,37 +7,34 @@ from .util import _check_alsa_error
 
 if TYPE_CHECKING:
     from .client import SequencerClient
-    from .port import SequencerPort, SequencerPortInfo
+    from .port import Port, PortInfo
 
 
-SequencerAddressType = Union['SequencerAddress',
-                             'SequencerPort',
-                             'SequencerPortInfo',
-                             Tuple[int, int]]
+AddressType = Union['Address', 'Port', 'PortInfo', Tuple[int, int]]
 
 
-class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id")):
+class Address(namedtuple("Address", "client_id port_id")):
     __slots__ = ()
 
     @overload
-    def __new__(cls, arg1: int, arg2: int = 0) -> 'SequencerAddress':
+    def __new__(cls, arg1: int, arg2: int = 0) -> 'Address':
         ...
 
     @overload
-    def __new__(cls, arg1: SequencerAddressType) -> 'SequencerAddress':
+    def __new__(cls, arg1: AddressType) -> 'Address':
         ...
 
     @overload
-    def __new__(cls, arg1: str) -> 'SequencerAddress':
+    def __new__(cls, arg1: str) -> 'Address':
         ...
 
     @overload
-    def __new__(cls, arg1: 'SequencerClient', arg2: int = 0) -> 'SequencerAddress':
+    def __new__(cls, arg1: 'SequencerClient', arg2: int = 0) -> 'Address':
         ...
 
     def __new__(cls,
-                arg1: Union[int, str, SequencerAddressType, 'SequencerClient'],
-                arg2: int = 0) -> 'SequencerAddress':
+                arg1: Union[int, str, AddressType, 'SequencerClient'],
+                arg2: int = 0) -> 'Address':
         if isinstance(arg1, str):
             tple: Any = cls._parse(arg1)
             return tuple.__new__(cls, tple)
@@ -64,10 +61,9 @@ class SequencerAddress(namedtuple("SequencerAddress", "client_id port_id")):
         return f"{self.client_id}:{self.port_id}"
 
 
-ALL_SUBSCRIBERS = SequencerAddress(alsa.SND_SEQ_ADDRESS_SUBSCRIBERS, 0)
-SYSTEM_TIMER = SequencerAddress(alsa.SND_SEQ_CLIENT_SYSTEM, alsa.SND_SEQ_PORT_SYSTEM_TIMER)
-SYSTEM_ANNOUNCE = SequencerAddress(alsa.SND_SEQ_CLIENT_SYSTEM,
-                                   alsa.SND_SEQ_PORT_SYSTEM_ANNOUNCE)
+ALL_SUBSCRIBERS = Address(alsa.SND_SEQ_ADDRESS_SUBSCRIBERS, 0)
+SYSTEM_TIMER = Address(alsa.SND_SEQ_CLIENT_SYSTEM, alsa.SND_SEQ_PORT_SYSTEM_TIMER)
+SYSTEM_ANNOUNCE = Address(alsa.SND_SEQ_CLIENT_SYSTEM, alsa.SND_SEQ_PORT_SYSTEM_ANNOUNCE)
 
-__all__ = ["SequencerAddress", "SequencerAddressType",
+__all__ = ["Address", "AddressType",
            "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE"]

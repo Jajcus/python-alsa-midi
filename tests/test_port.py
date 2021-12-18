@@ -3,8 +3,7 @@ from typing import Any
 
 import pytest
 
-from alsa_midi import (SequencerAddress, SequencerClient, SequencerPort, SequencerPortCaps,
-                       SequencerPortInfo, SequencerPortType, alsa, ffi)
+from alsa_midi import Address, Port, PortCaps, PortInfo, PortType, SequencerClient, alsa, ffi
 from alsa_midi.port import get_port_info_sort_key
 
 
@@ -13,7 +12,7 @@ def test_port_create_close():
     client = SequencerClient("test_c")
     port = client.create_port("test_p")
 
-    assert isinstance(port, SequencerPort)
+    assert isinstance(port, Port)
     assert port.client is client
 
     port.close()
@@ -29,7 +28,7 @@ def test_port_create_del():
     client = SequencerClient("test_c")
     port = client.create_port("test_p")
 
-    assert isinstance(port, SequencerPort)
+    assert isinstance(port, Port)
     assert port.client is client
 
     del port
@@ -80,25 +79,25 @@ def test_port_as_address():
             self.handle = None
 
     client: Any = ClientMock(129)
-    port = SequencerPort(client, 3)
+    port = Port(client, 3)
 
     assert port.client_id == 129
     assert port.port_id == 3
 
-    addr = SequencerAddress(port)
-    assert addr == SequencerAddress(129, 3)
+    addr = Address(port)
+    assert addr == Address(129, 3)
 
 
 def test_port_info():
 
     # test defaults
-    info = SequencerPortInfo(client_id=11)
+    info = PortInfo(client_id=11)
 
     assert info.client_id == 11
     assert info.port_id == 0
     assert info.name == ""
-    assert info.capability == SequencerPortCaps._NONE
-    assert info.type == SequencerPortType.ANY
+    assert info.capability == PortCaps._NONE
+    assert info.type == PortType.ANY
     assert info.midi_channels == 0
     assert info.midi_voices == 0
     assert info.synth_voices == 0
@@ -108,28 +107,28 @@ def test_port_info():
     assert info.timestamping is False
     assert info.timestamp_real is False
     assert info.timestamp_queue_id == 0
-    assert SequencerAddress(info) == SequencerAddress(11, 0)
+    assert Address(info) == Address(11, 0)
 
     # test initializing all attributes
-    info = SequencerPortInfo(client_id=15,
-                             port_id=17,
-                             name="port_info_test2",
-                             capability=SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE,
-                             type=SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER,
-                             midi_channels=1,
-                             midi_voices=2,
-                             synth_voices=3,
-                             read_use=4,
-                             write_use=5,
-                             timestamping=True,
-                             timestamp_real=True,
-                             timestamp_queue_id=6)
+    info = PortInfo(client_id=15,
+                    port_id=17,
+                    name="port_info_test2",
+                    capability=PortCaps.WRITE | PortCaps.SUBS_WRITE,
+                    type=PortType.MIDI_GENERIC | PortType.SYNTHESIZER,
+                    midi_channels=1,
+                    midi_voices=2,
+                    synth_voices=3,
+                    read_use=4,
+                    write_use=5,
+                    timestamping=True,
+                    timestamp_real=True,
+                    timestamp_queue_id=6)
 
     assert info.client_id == 15
     assert info.port_id == 17
     assert info.name == "port_info_test2"
-    assert info.capability == SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
-    assert info.type == SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER
+    assert info.capability == PortCaps.WRITE | PortCaps.SUBS_WRITE
+    assert info.type == PortType.MIDI_GENERIC | PortType.SYNTHESIZER
     assert info.midi_channels == 1
     assert info.midi_voices == 2
     assert info.synth_voices == 3
@@ -139,7 +138,7 @@ def test_port_info():
     assert info.timestamping is True
     assert info.timestamp_real is True
     assert info.timestamp_queue_id == 6
-    assert SequencerAddress(info) == SequencerAddress(15, 17)
+    assert Address(info) == Address(15, 17)
 
     # test _to_alsa (only some values are writable to the ALSA struct)
     alsa_info = info._to_alsa()
@@ -182,13 +181,13 @@ def test_port_info():
     alsa.snd_seq_port_info_set_timestamp_real(alsa_info, 1)
     alsa.snd_seq_port_info_set_timestamp_queue(alsa_info, 16)
 
-    info = SequencerPortInfo._from_alsa(alsa_info)
+    info = PortInfo._from_alsa(alsa_info)
 
     assert info.client_id == 115
     assert info.port_id == 117
     assert info.name == "port_info_test3"
-    assert info.capability == SequencerPortCaps.WRITE | SequencerPortCaps.SUBS_WRITE
-    assert info.type == SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER
+    assert info.capability == PortCaps.WRITE | PortCaps.SUBS_WRITE
+    assert info.type == PortType.MIDI_GENERIC | PortType.SYNTHESIZER
     assert info.midi_channels == 11
     assert info.midi_voices == 12
     assert info.synth_voices == 13
@@ -199,22 +198,22 @@ def test_port_info():
 
 
 def test_port_info_sort_key():
-    p0 = SequencerPortInfo(client_id=128, port_id=0, name="p0",
-                           type=SequencerPortType.MIDI_GENERIC)
-    p1 = SequencerPortInfo(client_id=128, port_id=1, name="p1",
-                           type=SequencerPortType.SPECIFIC)
-    p2 = SequencerPortInfo(client_id=128, port_id=2, name="p2",
-                           type=SequencerPortType.MIDI_GENERIC | SequencerPortType.MIDI_GM)
-    p3 = SequencerPortInfo(client_id=128, port_id=3, name="p3",
-                           type=SequencerPortType.SPECIFIC)
-    p4 = SequencerPortInfo(client_id=128, port_id=4, name="p4",
-                           type=SequencerPortType.MIDI_GENERIC)
+    p0 = PortInfo(client_id=128, port_id=0, name="p0",
+                  type=PortType.MIDI_GENERIC)
+    p1 = PortInfo(client_id=128, port_id=1, name="p1",
+                  type=PortType.SPECIFIC)
+    p2 = PortInfo(client_id=128, port_id=2, name="p2",
+                  type=PortType.MIDI_GENERIC | PortType.MIDI_GM)
+    p3 = PortInfo(client_id=128, port_id=3, name="p3",
+                  type=PortType.SPECIFIC)
+    p4 = PortInfo(client_id=128, port_id=4, name="p4",
+                  type=PortType.MIDI_GENERIC)
     p4.client_name = "Midi Through"
 
-    p10 = SequencerPortInfo(client_id=129, port_id=0, name="p10",
-                            type=SequencerPortType.MIDI_GENERIC)
-    p11 = SequencerPortInfo(client_id=129, port_id=1, name="p11",
-                            type=SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER)
+    p10 = PortInfo(client_id=129, port_id=0, name="p10",
+                   type=PortType.MIDI_GENERIC)
+    p11 = PortInfo(client_id=129, port_id=1, name="p11",
+                   type=PortType.MIDI_GENERIC | PortType.SYNTHESIZER)
 
     k = get_port_info_sort_key([])
     assert k(p0) < k(p1)
@@ -230,8 +229,8 @@ def test_port_info_sort_key():
     assert k(p10) < k(p4)  # midi through always last
     assert k(p11) < k(p4)  # midi through always last
 
-    k = get_port_info_sort_key([SequencerPortType.MIDI_GENERIC | SequencerPortType.SYNTHESIZER,
-                                SequencerPortType.MIDI_GENERIC])
+    k = get_port_info_sort_key([PortType.MIDI_GENERIC | PortType.SYNTHESIZER,
+                                PortType.MIDI_GENERIC])
     assert k(p0) < k(p1)
     assert k(p1) > k(p2)
     assert k(p2) < k(p3)

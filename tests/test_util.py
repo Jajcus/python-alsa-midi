@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from alsa_midi import SequencerALSAError
+from alsa_midi import ALSAError
 from alsa_midi.util import _check_alsa_error, _ensure_4bit, _ensure_7bit
 
 
@@ -14,20 +14,20 @@ def test_check_alsa_error():
     _check_alsa_error(100)
     _check_alsa_error(10000)
 
-    with pytest.raises(SequencerALSAError) as exc_info:
+    with pytest.raises(ALSAError) as exc_info:
         _check_alsa_error(-1)
     assert exc_info.value.errnum == -1
     assert isinstance(exc_info.value.message, str)
     assert str(exc_info.value.message) == exc_info.value.message
 
-    with pytest.raises(SequencerALSAError) as exc_info:
+    with pytest.raises(ALSAError) as exc_info:
         _check_alsa_error(-errno.ENOENT)
     assert exc_info.value.errnum == -errno.ENOENT
     assert isinstance(exc_info.value.message, str)
     assert str(exc_info.value.message) == exc_info.value.message
     assert exc_info.value.message == os.strerror(errno.ENOENT)
 
-    with pytest.raises(SequencerALSAError) as exc_info:
+    with pytest.raises(ALSAError) as exc_info:
         _check_alsa_error(-500000)
     assert exc_info.value.errnum == -500000
     assert isinstance(exc_info.value.message, str)
