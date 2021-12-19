@@ -20,7 +20,7 @@ def main():
 
     if args.port:
         for target_port in args.port:
-            port.connect_to(target_port)
+            port.connect_from(target_port)
 
     try:
         while True:
