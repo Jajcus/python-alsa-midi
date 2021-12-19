@@ -127,7 +127,11 @@ class SequencerClientBase:
         self._get_fds()
 
     def __del__(self):
-        self.close()
+        try:
+            self.close()
+        except AttributeError:
+            # not fully initialized
+            pass
 
     def _check_handle(self):
         if self._handle_p is None:
