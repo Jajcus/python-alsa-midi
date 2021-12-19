@@ -233,6 +233,32 @@ def _specialized_event_class(event_type):
     return decorator
 
 
+class ResultEventBase(Event):
+    def __init__(self,
+                 event: int,
+                 result: int,
+                 **kwargs):
+        assert self.type is not None
+        super().__init__(self.type, **kwargs)
+        self.event = event
+        self.result = result
+
+    def __repr__(self):
+        return (f"<{self.__class__.__name__} event={self.event} result={self.result}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["event"] = event.data.result.event
+        kwargs["result"] = event.data.result.result
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.data.result.event = self.event
+        event.data.result.result = self.result
+        return event
+
+
 class NoteEventBase(Event):
     def __init__(self,
                  note: int,
@@ -262,6 +288,105 @@ class NoteEventBase(Event):
         event.data.note.channel = self.channel
         event.data.note.velocity = self.velocity
         return event
+
+
+class ControlChangeEventBase(Event):
+    def __init__(self,
+                 channel: int,
+                 param: int,
+                 value: int,
+                 **kwargs):
+        assert self.type is not None
+        super().__init__(self.type, **kwargs)
+        self.channel = channel
+        self.param = param
+        self.value = value
+
+    def __repr__(self):
+        return (f"<{self.__class__.__name__} channel={self.channel}"
+                f" param={self.param} value={self.value}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["channel"] = event.data.control.channel
+        kwargs["param"] = event.data.control.param
+        kwargs["value"] = event.data.control.value
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.data.result.channel = self.channel
+        event.data.result.param = self.param
+        event.data.result.value = self.value
+        return event
+
+
+class ParamChangeEventBase(Event):
+    def __init__(self,
+                 channel: int,
+                 value: int,
+                 **kwargs):
+        assert self.type is not None
+        super().__init__(self.type, **kwargs)
+        self.channel = channel
+        self.value = value
+
+    def __repr__(self):
+        return (f"<{self.__class__.__name__} channel={self.channel} value={self.value}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["channel"] = event.data.control.channel
+        kwargs["value"] = event.data.control.value
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.data.result.channel = self.channel
+        event.data.result.value = self.value
+        return event
+
+
+class QueueControlEventBase(Event):
+    def __init__(self,
+                 control_queue: Optional[Union[int, 'Queue']] = None,
+                 **kwargs):
+        assert self.type is not None
+        super().__init__(self.type, **kwargs)
+        if isinstance(control_queue, int):
+            self.control_queue = control_queue
+        elif control_queue is not None:
+            self.control_queue = control_queue.queue_id
+        else:
+            self.control_queue = None
+
+    def __repr__(self):
+        if self.control_queue is not None:
+            return (f"<{self.__class__.__name__} queue={self.queue}>")
+        else:
+            return (f"<{self.__class__.__name__}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["control_queue"] = event.data.queue.queue
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        queue = self.control_queue
+        if queue is not None:
+            event.data.queue.queue_id = queue
+        return event
+
+
+@_specialized_event_class(EventType.SYSTEM)
+class SystemEvent(ResultEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.RESULT)
+class ResultEvent(ResultEventBase):
+    pass
 
 
 @_specialized_event_class(EventType.NOTE)
@@ -303,6 +428,129 @@ class NoteOnEvent(NoteEventBase):
 @_specialized_event_class(EventType.NOTEOFF)
 class NoteOffEvent(NoteEventBase):
     pass
+
+
+@_specialized_event_class(EventType.KEYPRESS)
+class KeyPressEvent(NoteEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.CONTROLLER)
+class ControlChangeEvent(ControlChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.PGMCHANGE)
+class ProgramChangeEvent(ParamChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.CHANPRESS)
+class ChannelPressureEvent(ParamChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.PITCHBEND)
+class PitchBendEvent(ParamChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.CONTROL14)
+class Control14BitChangeEvent(ControlChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.NONREGPARAM)
+class NonRegisteredParameterChangeEvent(ControlChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.REGPARAM)
+class RegisteredParameterChangeEvent(ControlChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.SONGPOS)
+class SongPositionPointerEvent(ParamChangeEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.SONGSEL)
+class SongSelectEvent(ParamChangeEventBase):
+    pass
+
+# TODO: TIMESIGN
+
+# TODO: KEYSIGN
+
+
+@_specialized_event_class(EventType.START)
+class StartEvent(QueueControlEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.CONTINUE)
+class ContinueEvent(QueueControlEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.STOP)
+class StopEvent(QueueControlEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.SETPOS_TICK)
+class SetQueuePositionTick(QueueControlEventBase):
+    def __init__(self,
+                 tick: int,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tick = tick
+
+    def __repr__(self):
+        if self.control_queue is not None:
+            return (f"<{self.__class__.__name__} queue={self.queue} tick={self.tick}>")
+        else:
+            return (f"<{self.__class__.__name__} tick={self.tick}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["tick"] = event.data.queue.time.tick
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.data.queue.time.tick = self.tick
+        return event
+
+
+@_specialized_event_class(EventType.SETPOS_TIME)
+class SetQueuePositionTime(QueueControlEventBase):
+    def __init__(self,
+                 time: float,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.time = float(time)
+
+    def __repr__(self):
+        if self.control_queue is not None:
+            return (f"<{self.__class__.__name__} queue={self.queue} time={self.time}>")
+        else:
+            return (f"<{self.__class__.__name__} time={self.time}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["time"] = (event.data.queue.time.time.tv_sec
+                          + 0.000000001 * event.data.queue.time.time.tv_nsec)
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        sec = int(self.time)
+        nsec = int((self.time - sec) * 1000000000)
+        event.data.queue.time.time.tv_sec = sec
+        event.data.queue.time.time.tv_nsec = nsec
+        return event
 
 
 __all__ = [
