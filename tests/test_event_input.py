@@ -34,7 +34,7 @@ def test_event_input():
     assert time.monotonic() - start >= 0.5
 
     # play a midi file to our port
-    filename = os.path.join(DATA_DIR, "test-c-major-scale-fast.mid")
+    filename = os.path.join(DATA_DIR, "c_major.mid")
     cmd = ["aplaymidi", "-p", str(Address(port)), "-d", "0", filename]
     player = subprocess.Popen(cmd)
 
