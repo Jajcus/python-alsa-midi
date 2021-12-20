@@ -214,9 +214,9 @@ class Event:
         else:
             event.dest.client = alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
 
-        if self.__class__ == Event and self.raw_data is not None:
-            # not for subclasses:
+        if self.raw_data is not None:
             # set raw data
+            # may be overwritten by structured data in a specialized class
             buf = ffi.buffer(ffi.addressof(event.data))
             buf[:min(len(self.raw_data), 12)] = self.raw_data[:12]
 
@@ -379,6 +379,94 @@ class QueueControlEventBase(Event):
         return event
 
 
+class AddressEventBase(Event):
+    addr: Address
+
+    def __init__(self,
+                 addr: AddressType,
+                 **kwargs):
+        assert self.type is not None
+        super().__init__(self.type, **kwargs)
+        self.addr = Address(addr)
+
+    def __repr__(self):
+        return (f"<{self.__class__.__name__} {self.addr}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["addr"] = Address(event.data.addr.client, event.data.addr.port)
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.event.data.addr.client = self.addr.client_id
+        event.event.data.addr.port = self.addr.port_id
+        return event
+
+
+class ConnectEventBase(Event):
+    connect_sender: Address
+    connect_dest: Address
+
+    def __init__(self,
+                 connect_sender: AddressType,
+                 connect_dest: AddressType,
+                 **kwargs):
+        assert self.type is not None
+        super().__init__(self.type, **kwargs)
+        self.connect_sender = Address(connect_sender)
+        self.connect_dest = Address(connect_dest)
+
+    def __repr__(self):
+        return (f"<{self.__class__.__name__} from {self.connect_sender} to {self.connect_dest}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["connect_sender"] = Address(event.data.connect.sender.client,
+                                           event.data.connect.sender.port)
+        kwargs["connect_dest"] = Address(event.data.connect.dest.client,
+                                         event.data.connect.dest.port)
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.event.data.connect.sender.client = self.connect_sender.client_id
+        event.event.data.connect.sender.port = self.connect_sender.port_id
+        event.event.data.connect.dest.client = self.connect_dest.client_id
+        event.event.data.connect.dest.port = self.connect_dest.port_id
+        return event
+
+
+class ExternalDataEventBase(Event):
+    data: bytes
+
+    def __init__(self,
+                 data: bytes,
+                 **kwargs):
+        assert self.type is not None
+        super().__init__(self.type, **kwargs)
+        self.data = bytes(data)
+
+    def __repr__(self):
+        if len(self.data) < 32:
+            return (f"<{self.__class__.__name__} data={self.data!r}>")
+        else:
+            return (f"<{self.__class__.__name__} data=<{len(self.data)} bytes>>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        data = bytes(ffi.buffer(event.data.ext.data, event.data.ext.len))
+        kwargs["data"] = data
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.flags |= alsa.SND_SEQ_EVENT_LENGTH_VARIABLE
+        event.data.ext.len = len(self.data)
+        event.data.ext.data = ffi.from_buffer(self.data)
+        return event
+
+
 @_specialized_event_class(EventType.SYSTEM)
 class SystemEvent(ResultEventBase):
     pass
@@ -479,9 +567,17 @@ class SongPositionPointerEvent(ParamChangeEventBase):
 class SongSelectEvent(ParamChangeEventBase):
     pass
 
-# TODO: TIMESIGN
 
-# TODO: KEYSIGN
+# how is it encoded into snd_seq_ev_ctrl_t?
+@_specialized_event_class(EventType.TIMESIGN)
+class TimeSignatureEvent(ParamChangeEventBase):
+    pass
+
+
+# how is it encoded into snd_seq_ev_ctrl_t?
+@_specialized_event_class(EventType.KEYSIGN)
+class KeySignatureEvent(ParamChangeEventBase):
+    pass
 
 
 @_specialized_event_class(EventType.START)
@@ -500,7 +596,7 @@ class StopEvent(QueueControlEventBase):
 
 
 @_specialized_event_class(EventType.SETPOS_TICK)
-class SetQueuePositionTick(QueueControlEventBase):
+class SetQueuePositionTickEvent(QueueControlEventBase):
     def __init__(self,
                  tick: int,
                  *args, **kwargs):
@@ -525,7 +621,7 @@ class SetQueuePositionTick(QueueControlEventBase):
 
 
 @_specialized_event_class(EventType.SETPOS_TIME)
-class SetQueuePositionTime(QueueControlEventBase):
+class SetQueuePositionTimeEvent(QueueControlEventBase):
     def __init__(self,
                  time: float,
                  *args, **kwargs):
@@ -540,17 +636,224 @@ class SetQueuePositionTime(QueueControlEventBase):
 
     @classmethod
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
-        kwargs["time"] = (event.data.queue.time.time.tv_sec
-                          + 0.000000001 * event.data.queue.time.time.tv_nsec)
+        kwargs["time"] = (event.data.queue.param.time.time.tv_sec
+                          + 0.000000001 * event.data.queue.param.time.time.tv_nsec)
         return super()._from_alsa(event, **kwargs)
 
     def _to_alsa(self, **kwargs):
         event: _snd_seq_event_t = super()._to_alsa(**kwargs)
         sec = int(self.time)
         nsec = int((self.time - sec) * 1000000000)
-        event.data.queue.time.time.tv_sec = sec
-        event.data.queue.time.time.tv_nsec = nsec
+        event.data.queue.param.time.time.tv_sec = sec
+        event.data.queue.param.time.time.tv_nsec = nsec
         return event
+
+
+@_specialized_event_class(EventType.TEMPO)
+class SetQueueTempoEvent(QueueControlEventBase):
+    def __init__(self,
+                 midi_tempo: int = None,
+                 *,
+                 bpm: float = None,
+                 **kwargs):
+        if midi_tempo is not None and bpm is not None:
+            raise ValueError("Either tempo or must be provided, not both.")
+        if midi_tempo is not None:
+            self.midi_tempo = midi_tempo
+        elif bpm is not None:
+            self.midi_tempo = int(60000000.0 / bpm)
+        else:
+            raise ValueError("Either tempo or must be provided.")
+        super().__init__(**kwargs)
+
+    @property
+    def bpm(self):
+        return 60000000.0 / self.midi_tempo
+
+    def __repr__(self):
+        tempo = self.midi_tempo
+        bpm = self.bpm
+        if self.control_queue is not None:
+            return (f"<{self.__class__.__name__} queue={self.queue} tempo={tempo} ({bpm} bpm)>")
+        else:
+            return (f"<{self.__class__.__name__} tempo={tempo} ({bpm} bpm)>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["midi_tempo"] = event.data.queue.param.value
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.data.queue.param.value = self.midi_tempo
+        return event
+
+
+@_specialized_event_class(EventType.CLOCK)
+class ClockEvent(QueueControlEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.TICK)
+class TickEvent(QueueControlEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.QUEUE_SKEW)
+class QueueSkewEvent(QueueControlEventBase):
+    value: int
+    base: int
+
+    def __init__(self,
+                 value: int,
+                 base: int,
+                 *args, **kwargs):
+        self.value = value
+        self.base = base
+        super().__init__(*args, **kwargs)
+
+    def __repr__(self):
+        if self.control_queue is not None:
+            return (f"<{self.__class__.__name__} queue={self.queue}"
+                    f" value={self.value} base={self.base}>")
+        else:
+            return (f"<{self.__class__.__name__} value={self.value} base={self.base}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["value"] = event.data.queue.param.skew.value
+        kwargs["base"] = event.data.queue.param.skew.base
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.data.queue.param.skew.value = self.value
+        event.data.queue.param.skew.base = self.base
+        return event
+
+
+@_specialized_event_class(EventType.SYNC_POS)
+class SyncPositionChangedEvent(QueueControlEventBase):
+    position: int
+
+    def __init__(self,
+                 position: int,
+                 *args, **kwargs):
+        self.position = position
+        super().__init__(*args, **kwargs)
+
+    def __repr__(self):
+        if self.control_queue is not None:
+            return (f"<{self.__class__.__name__} queue={self.queue} position={self.position}>")
+        else:
+            return (f"<{self.__class__.__name__} position={self.position}>")
+
+    @classmethod
+    def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
+        kwargs["position"] = event.data.queue.param.position
+        return super()._from_alsa(event, **kwargs)
+
+    def _to_alsa(self, **kwargs):
+        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+        event.data.queue.param.position = self.position
+        return event
+
+
+@_specialized_event_class(EventType.TUNE_REQUEST)
+class TuneRequestEvent(Event):
+    pass
+
+
+@_specialized_event_class(EventType.RESET)
+class ResetEvent(Event):
+    pass
+
+
+@_specialized_event_class(EventType.SENSING)
+class ActiveSensingEvent(Event):
+    pass
+
+
+@_specialized_event_class(EventType.ECHO)
+class EchoEvent(Event):
+    def __repr__(self):
+        return (f"<{self.__class__.__name__} data={self.raw_data!r}>")
+
+
+@_specialized_event_class(EventType.ECHO)
+class OSSEvent(Event):
+    def __repr__(self):
+        return (f"<{self.__class__.__name__} data={self.raw_data!r}>")
+
+
+@_specialized_event_class(EventType.CLIENT_START)
+class ClientStartEvent(AddressEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.CLIENT_EXIT)
+class ClientExitEvent(AddressEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.CLIENT_CHANGE)
+class ClientChangeEvent(AddressEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.PORT_START)
+class PortStartEvent(AddressEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.PORT_EXIT)
+class PortExitEvent(AddressEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.PORT_CHANGE)
+class PortChangeEvent(AddressEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.PORT_SUBSCRIBED)
+class PortSubscribedEvent(ConnectEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.PORT_UNSUBSCRIBED)
+class PortUnsubscribedEvent(ConnectEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.SYSEX)
+class SysExEvent(ExternalDataEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.BOUNCE)
+class BounceEvent(ExternalDataEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.USR_VAR0)
+class UserVar0Event(ExternalDataEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.USR_VAR1)
+class UserVar1Event(ExternalDataEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.USR_VAR2)
+class UserVar2Event(ExternalDataEventBase):
+    pass
+
+
+@_specialized_event_class(EventType.USR_VAR3)
+class UserVar3Event(ExternalDataEventBase):
+    pass
 
 
 __all__ = [
