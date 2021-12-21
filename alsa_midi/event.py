@@ -11,6 +11,47 @@ if TYPE_CHECKING:
     from .queue import Queue
 
 
+class RealTime:
+    __slots__ = ('seconds', 'nanoseconds')
+
+    seconds: int
+    nanoseconds: int
+
+    def __init__(self, seconds: Union[float, int, str, 'RealTime'], nanoseconds: int = 0):
+        if isinstance(seconds, RealTime):
+            self.seconds = seconds.seconds
+            self.nanoseconds = seconds.nanoseconds + nanoseconds
+        else:
+            if isinstance(seconds, str):
+                if "." in seconds:
+                    seconds = float(seconds)
+                else:
+                    seconds = int(seconds)
+            if isinstance(seconds, float):
+                self.seconds = int(seconds)
+                self.nanoseconds = int(nanoseconds + 1000000000 * (seconds - self.seconds))
+            else:
+                self.seconds = seconds
+                self.nanoseconds = nanoseconds
+        if self.nanoseconds >= 1000000000:
+            self.seconds += self.nanoseconds // 1000000000
+            self.nanoseconds = self.nanoseconds % 1000000000
+        if self.seconds < 0 or self.nanoseconds < 0:
+            raise ValueError("Negative RealTime is not allowed")
+
+    def __repr__(self):
+        return f"RealTime(seconds={self.seconds}, nanoseconds={self.nanoseconds})"
+
+    def __str__(self):
+        return f"{self.seconds}.{self.nanoseconds:09d}"
+
+    def __int__(self):
+        return self.seconds
+
+    def __float__(self):
+        return float(self.seconds) + self.nanoseconds / 1000000000
+
+
 class EventType(IntEnum):
     SYSTEM = alsa.SND_SEQ_EVENT_SYSTEM
     RESULT = alsa.SND_SEQ_EVENT_RESULT
@@ -87,13 +128,15 @@ class Event:
     _specialized = {}
     type = None
 
+    time: Optional[RealTime]
+
     def __init__(self,
                  type: EventType,
                  *,
                  flags: Optional[int] = 0,
                  tag: int = 0,
                  queue: Optional[int] = None,
-                 time: Optional[float] = None,
+                 time: Optional[RealTime] = None,
                  tick: Optional[int] = None,
                  source: Optional[Tuple[int, int]] = None,
                  dest: Optional[Tuple[int, int]] = None,
@@ -139,7 +182,7 @@ class Event:
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
         flags = event.flags
         if (flags & alsa.SND_SEQ_TIME_STAMP_MASK) == alsa.SND_SEQ_TIME_STAMP_REAL:
-            ev_time = event.time.time.tv_sec + 0.000000001 * event.time.tim.tv_nsec
+            ev_time = RealTime(event.time.time.tv_sec, event.time.tim.tv_nsec)
         else:
             ev_time = None
         if (flags & alsa.SND_SEQ_TIME_STAMP_MASK) == alsa.SND_SEQ_TIME_STAMP_TICK:
@@ -185,10 +228,8 @@ class Event:
             event.queue = alsa.SND_SEQ_QUEUE_DIRECT
         assert self.time is None or self.tick is None
         if self.time is not None:
-            sec = int(self.time)
-            nsec = int((self.time - sec) * 1000000000)
-            event.time.time.tv_sec = sec
-            event.time.time.tv_nsec = nsec
+            event.time.time.tv_sec = self.time.seconds
+            event.time.time.tv_nsec = self.time.nanoseconds
             flags &= ~(alsa.SND_SEQ_TIME_STAMP_MASK | alsa.SND_SEQ_TIME_STAMP_REAL)
         if self.tick is not None:
             event.time.tick = self.tick
@@ -598,54 +639,52 @@ class StopEvent(QueueControlEventBase):
 @_specialized_event_class(EventType.SETPOS_TICK)
 class SetQueuePositionTickEvent(QueueControlEventBase):
     def __init__(self,
-                 tick: int,
+                 position: int,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.tick = tick
+        self.position = position
 
     def __repr__(self):
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue} tick={self.tick}>")
+            return (f"<{self.__class__.__name__} queue={self.queue} tick={self.position}>")
         else:
-            return (f"<{self.__class__.__name__} tick={self.tick}>")
+            return (f"<{self.__class__.__name__} tick={self.position}>")
 
     @classmethod
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
-        kwargs["tick"] = event.data.queue.time.tick
+        kwargs["position"] = event.data.queue.time.tick
         return super()._from_alsa(event, **kwargs)
 
     def _to_alsa(self, **kwargs):
         event: _snd_seq_event_t = super()._to_alsa(**kwargs)
-        event.data.queue.time.tick = self.tick
+        event.data.queue.time.tick = self.position
         return event
 
 
 @_specialized_event_class(EventType.SETPOS_TIME)
 class SetQueuePositionTimeEvent(QueueControlEventBase):
     def __init__(self,
-                 time: float,
+                 time: Union[RealTime, int, float],
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.time = float(time)
+        self.position = RealTime(time)
 
     def __repr__(self):
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue} time={self.time}>")
+            return (f"<{self.__class__.__name__} queue={self.queue} time={self.position}>")
         else:
-            return (f"<{self.__class__.__name__} time={self.time}>")
+            return (f"<{self.__class__.__name__} time={self.position}>")
 
     @classmethod
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
-        kwargs["time"] = (event.data.queue.param.time.time.tv_sec
-                          + 0.000000001 * event.data.queue.param.time.time.tv_nsec)
+        kwargs["time"] = RealTime(event.data.queue.param.time.time.tv_sec,
+                                  event.data.queue.param.time.time.tv_nsec)
         return super()._from_alsa(event, **kwargs)
 
     def _to_alsa(self, **kwargs):
         event: _snd_seq_event_t = super()._to_alsa(**kwargs)
-        sec = int(self.time)
-        nsec = int((self.time - sec) * 1000000000)
-        event.data.queue.param.time.time.tv_sec = sec
-        event.data.queue.param.time.time.tv_nsec = nsec
+        event.data.queue.param.time.time.tv_sec = self.position.seconds
+        event.data.queue.param.time.time.tv_nsec = self.position.nanoseconds
         return event
 
 
@@ -857,6 +896,7 @@ class UserVar3Event(ExternalDataEventBase):
 
 
 __all__ = [
+        "RealTime",
         "EventType", "Event",
         "NoteEventBase",
         "NoteOnEvent", "NoteOffEvent"
