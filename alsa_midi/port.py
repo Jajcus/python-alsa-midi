@@ -8,7 +8,7 @@ from .exceptions import Error, StateError
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
-    from .client import SequencerBase, _snd_seq_t
+    from .client import SequencerClientBase, _snd_seq_t
 
 
 class PortCaps(IntFlag):
@@ -67,7 +67,7 @@ class Port:
     client_id: int
     port_id: int
 
-    def __init__(self, client: 'SequencerBase', port_id: int):
+    def __init__(self, client: 'SequencerClientBase', port_id: int):
         self.client_id = client.client_id
         self.port_id = port_id
         self.client = client
