@@ -1,5 +1,5 @@
 
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 from typing import TYPE_CHECKING, Any, NewType, Optional, Tuple, Union
 
 from ._ffi import alsa, ffi
@@ -121,6 +121,25 @@ class EventType(IntEnum):
         return obj
 
 
+class EventFlags(IntFlag):
+    TIME_STAMP_TICK = alsa.SND_SEQ_TIME_STAMP_TICK
+    TIME_STAMP_REAL = alsa.SND_SEQ_TIME_STAMP_REAL
+    TIME_STAMP_MASK = alsa.SND_SEQ_TIME_STAMP_MASK
+
+    TIME_MODE_ABS = alsa.SND_SEQ_TIME_MODE_ABS
+    TIME_MODE_REL = alsa.SND_SEQ_TIME_MODE_REL
+    TIME_MODE_MASK = alsa.SND_SEQ_TIME_MODE_MASK
+
+    EVENT_LENGTH_FIXED = alsa.SND_SEQ_EVENT_LENGTH_FIXED
+    EVENT_LENGTH_VARIABLE = alsa.SND_SEQ_EVENT_LENGTH_VARIABLE
+    EVENT_LENGTH_VARUSR = alsa.SND_SEQ_EVENT_LENGTH_VARUSR
+    EVENT_LENGTH_MASK = alsa.SND_SEQ_EVENT_LENGTH_MASK
+
+    PRIORITY_NORMAL = alsa.SND_SEQ_PRIORITY_NORMAL
+    PRIORITY_HIGH = alsa.SND_SEQ_PRIORITY_HIGH
+    PRIORITY_MASK = alsa.SND_SEQ_PRIORITY_MASK
+
+
 _snd_seq_event_t = NewType("_snd_seq_event_t", Any)
 
 
@@ -128,12 +147,13 @@ class Event:
     _specialized = {}
     type = None
 
+    flags: Optional[EventFlags]
     time: Optional[RealTime]
 
     def __init__(self,
                  type: EventType,
                  *,
-                 flags: Optional[int] = 0,
+                 flags: Optional[Union[EventFlags, int]] = 0,
                  tag: int = 0,
                  queue: Optional[int] = None,
                  time: Optional[RealTime] = None,
@@ -145,7 +165,10 @@ class Event:
                  ):
 
         self.type = type
-        self.flags = flags
+        if flags is not None:
+            self.flags = EventFlags(flags)
+        else:
+            flags = None
         self.tag = tag
 
         self.queue = queue
@@ -181,15 +204,15 @@ class Event:
     @classmethod
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
         flags = event.flags
-        if (flags & alsa.SND_SEQ_TIME_STAMP_MASK) == alsa.SND_SEQ_TIME_STAMP_REAL:
+        if (flags & EventFlags.TIME_STAMP_MASK) == EventFlags.TIME_STAMP_REAL:
             ev_time = RealTime(event.time.time.tv_sec, event.time.tim.tv_nsec)
         else:
             ev_time = None
-        if (flags & alsa.SND_SEQ_TIME_STAMP_MASK) == alsa.SND_SEQ_TIME_STAMP_TICK:
+        if (flags & EventFlags.TIME_STAMP_MASK) == EventFlags.TIME_STAMP_TICK:
             ev_tick = event.time.tick
         else:
             ev_tick = None
-        relative = (flags & alsa.SND_SEQ_TIME_MODE_MASK) == alsa.SND_SEQ_TIME_MODE_REL
+        relative = (flags & EventFlags.TIME_MODE_MASK) == EventFlags.TIME_MODE_REL
         raw_data = bytes(ffi.buffer(ffi.addressof(event.data)))
         if cls.type is None:
             kwargs["type"] = EventType(event.type)
@@ -230,13 +253,13 @@ class Event:
         if self.time is not None:
             event.time.time.tv_sec = self.time.seconds
             event.time.time.tv_nsec = self.time.nanoseconds
-            flags &= ~(alsa.SND_SEQ_TIME_STAMP_MASK | alsa.SND_SEQ_TIME_STAMP_REAL)
+            flags &= ~(EventFlags.TIME_STAMP_MASK | EventFlags.TIME_STAMP_REAL)
         if self.tick is not None:
             event.time.tick = self.tick
-            flags &= ~(alsa.SND_SEQ_TIME_STAMP_MASK | alsa.SND_SEQ_TIME_STAMP_TICK)
+            flags &= ~(EventFlags.TIME_STAMP_MASK | EventFlags.TIME_STAMP_TICK)
         if self.relative is not None:
-            rel = alsa.SND_SEQ_TIME_MODE_REL if self.relative else alsa.SND_SEQ_TIME_MODE_ABS
-            flags &= ~(alsa.SND_SEQ_TIME_MODE_MASK | rel)
+            rel = EventFlags.TIME_MODE_REL if self.relative else EventFlags.TIME_MODE_ABS
+            flags &= ~(EventFlags.TIME_MODE_MASK | rel)
         if port is not None:
             if isinstance(port, int):
                 event.source.port = port
@@ -261,7 +284,7 @@ class Event:
             buf = ffi.buffer(ffi.addressof(event.data))
             buf[:min(len(self.raw_data), 12)] = self.raw_data[:12]
 
-        event.flags = flags
+        event.flags = int(flags)
 
         return event
 
@@ -502,7 +525,7 @@ class ExternalDataEventBase(Event):
 
     def _to_alsa(self, **kwargs):
         event: _snd_seq_event_t = super()._to_alsa(**kwargs)
-        event.flags |= alsa.SND_SEQ_EVENT_LENGTH_VARIABLE
+        event.flags |= EventFlags.EVENT_LENGTH_VARIABLE
         event.data.ext.len = len(self.data)
         event.data.ext.data = ffi.from_buffer(self.data)
         return event
@@ -897,7 +920,7 @@ class UserVar3Event(ExternalDataEventBase):
 
 __all__ = [
         "RealTime",
-        "EventType", "Event",
+        "EventType", "EventFlags", "Event",
         "NoteEventBase",
         "NoteOnEvent", "NoteOffEvent"
         ]
