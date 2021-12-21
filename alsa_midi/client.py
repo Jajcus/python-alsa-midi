@@ -1,10 +1,11 @@
 
+import asyncio
 import errno
 import select
 import time
 from enum import IntEnum, IntFlag
 from functools import partial
-from typing import Any, Callable, List, NewType, Optional, Tuple, Union, overload
+from typing import Any, Awaitable, Callable, List, NewType, Optional, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
 from .address import AddressType
@@ -106,8 +107,7 @@ class SequencerClientBase:
     client_id: int
     handle: _snd_seq_t
     _handle_p: _snd_seq_t_p
-    _read_fds: List[int] = []
-    _write_fds: List[int] = []
+    _fd: int = -1
 
     def __init__(
             self,
@@ -148,14 +148,15 @@ class SequencerClientBase:
     def _get_fds(self):
         pfds_count = alsa.snd_seq_poll_descriptors_count(self.handle,
                                                          select.POLLIN | select.POLLOUT)
+        # current ALSA does not use more than one fd
+        # and if it would a lot of code would have to be more complicated
+        assert pfds_count == 1
         pfds = ffi.new("struct pollfd[]", pfds_count)
         filled = alsa.snd_seq_poll_descriptors(self.handle, pfds, pfds_count,
                                                select.POLLIN | select.POLLOUT)
-        for i in range(0, filled):
-            if pfds[i].events & select.POLLIN:
-                self._read_fds.append(pfds[i].fd)
-            if pfds[i].events & select.POLLOUT:
-                self._write_fds.append(pfds[i].fd)
+        assert filled == 1
+        assert (pfds[0].events & select.POLLIN) and (pfds[0].events & select.POLLOUT)
+        self._fd = pfds[0].fd
 
     def create_port(self,
                     name: str,
@@ -445,11 +446,9 @@ class SequencerClient(SequencerClientBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._read_poll = select.poll()
-        for fd in self._read_fds:
-            self._read_poll.register(fd, select.POLLIN)
+        self._read_poll.register(self._fd, select.POLLIN)
         self._write_poll = select.poll()
-        for fd in self._write_fds:
-            self._write_poll.register(fd, select.POLLOUT)
+        self._write_poll.register(self._fd, select.POLLOUT)
 
     def event_input(self, timeout: Optional[float] = None):
         if timeout:
@@ -519,6 +518,113 @@ class SequencerClient(SequencerClientBase):
                             queue: Union['Queue', int] = None,
                             port: Union['Port', int] = None,
                             dest: AddressType = None) -> int:
+        self._check_handle()
+        func = partial(self._event_output_direct, event, queue, port, dest)
+        return self._event_output_wait(func)
+
+
+class AsyncSequencerClient(SequencerClientBase):
+    async def aclose(self):
+        self.close()
+
+    async def event_input(self, timeout: Optional[float] = None):
+
+        result, event = self._event_input()
+        if result != -errno.EAGAIN:
+            _check_alsa_error(result)
+            return event
+
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        fd = self._fd
+
+        def reader_cb():
+            result = None
+            try:
+                result, event = self._event_input()
+            except Exception as err:
+                fut.set_exception(err)
+                return
+            finally:
+                if result != -errno.EAGAIN:
+                    loop.remove_reader(fd)
+            if result != -errno.EAGAIN:
+                fut.set_result((result, event))
+
+        loop.add_reader(fd, reader_cb)
+
+        if timeout:
+            try:
+                result, event = await asyncio.wait_for(fut, timeout)
+            except asyncio.TimeoutError:
+                return None
+        else:
+            result, event = await fut
+        _check_alsa_error(result)
+        return event
+
+    @overload
+    async def _event_output_wait(self, func) -> int:
+        ...
+
+    @overload
+    async def _event_output_wait(self, func, timeout: float) -> Union[int, None]:
+        ...
+
+    async def _event_output_wait(self, func, timeout: Optional[float] = None) -> Union[int, None]:
+        result = func()
+        if result != -errno.EAGAIN:
+            _check_alsa_error(result)
+            return result
+
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        fd = self._fd
+
+        def writer_cb():
+            result = None
+            try:
+                result = func()
+            except Exception as err:
+                fut.set_exception(err)
+                return
+            finally:
+                if result != -errno.EAGAIN:
+                    loop.remove_reader(fd)
+            if result != -errno.EAGAIN:
+                fut.set_result(result)
+
+        loop.add_reader(fd, writer_cb)
+
+        if timeout:
+            try:
+                result = await asyncio.wait_for(fut, timeout)
+            except asyncio.TimeoutError:
+                return None
+        else:
+            result = await fut
+        _check_alsa_error(result)
+        return result
+
+    def drain_output(self) -> Awaitable[int]:
+        self._check_handle()
+        func = partial(alsa.snd_seq_drain_output, self.handle)
+        return self._event_output_wait(func)
+
+    def event_output(self,
+                     event: Event,
+                     queue: Union['Queue', int] = None,
+                     port: Union['Port', int] = None,
+                     dest: AddressType = None) -> Awaitable[int]:
+        self._check_handle()
+        func = partial(self._event_output, event, queue, port, dest)
+        return self._event_output_wait(func)
+
+    def event_output_direct(self,
+                            event: Event,
+                            queue: Union['Queue', int] = None,
+                            port: Union['Port', int] = None,
+                            dest: AddressType = None) -> Awaitable[int]:
         self._check_handle()
         func = partial(self._event_output_direct, event, queue, port, dest)
         return self._event_output_wait(func)

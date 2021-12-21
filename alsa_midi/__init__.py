@@ -2,7 +2,7 @@
 
 from ._ffi import alsa, ffi
 from .address import ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER, Address
-from .client import ClientInfo, ClientType, SequencerClient
+from .client import AsyncSequencerClient, ClientInfo, ClientType, SequencerClient
 from .event import Event, EventFlags, EventType, NoteEventBase, NoteOffEvent, NoteOnEvent, RealTime
 from .exceptions import ALSAError, Error, StateError
 from .port import READ_PORT, RW_PORT, WRITE_PORT, Port, PortCaps, PortInfo, PortType
@@ -10,7 +10,7 @@ from .queue import Queue
 
 __all__ = [
         "Address", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE",
-        "SequencerClient", "ClientInfo", "ClientType",
+        "SequencerClient", "AsyncSequencerClient", "ClientInfo", "ClientType",
         "RealTime", "EventType", "EventFlags", "Event",
         "NoteEventBase", "NoteOnEvent",
         "NoteOffEvent",

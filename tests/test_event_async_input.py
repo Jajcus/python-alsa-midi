@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from alsa_midi import WRITE_PORT, Address, ALSAError, Event, SequencerClient
+from alsa_midi import WRITE_PORT, Address, ALSAError, AsyncSequencerClient, Event
 from alsa_midi.client import SequencerClientBase
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14,8 +14,9 @@ DATA_DIR = os.path.join(TESTS_DIR, "data")
 
 @pytest.mark.require_tool("aplaymidi")
 @pytest.mark.require_alsa_seq
-def test_event_input():
-    client = SequencerClient("test")
+@pytest.mark.asyncio
+async def test_event_input():
+    client = AsyncSequencerClient("test")
     port = client.create_port("input", WRITE_PORT)
 
     # flush any 'port connect' events that could been emitted by some session
@@ -29,7 +30,7 @@ def test_event_input():
 
     # should block for 0.5s
     start = time.monotonic()
-    event = client.event_input(timeout=0.5)
+    event = await client.event_input(timeout=0.5)
     assert event is None
     assert time.monotonic() - start >= 0.5
 
@@ -39,14 +40,15 @@ def test_event_input():
     player = subprocess.Popen(cmd)
 
     events = []
+    # 1 port subscribe, 8 note-on,  8 note-off, 1 port unsubscribe
     for _ in range(18):
-        event = client.event_input(timeout=1)
+        event = await client.event_input(timeout=2)
         assert isinstance(event, Event)
         events.append(event)
 
     # should block for 0.5s (no more events)
     start = time.monotonic()
-    event = client.event_input(timeout=0.5)
+    event = await client.event_input(timeout=0.5)
     assert event is None
     assert time.monotonic() - start >= 0.5
 
