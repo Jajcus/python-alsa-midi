@@ -7,7 +7,7 @@ from alsa_midi import WRITE_PORT, Address, SequencerClient
 
 def main():
     parser = ArgumentParser(description="Dump / sniff ALSA sequencer events")
-    parser.add_argument("--port", type=Address, action="append",
+    parser.add_argument("--port", "-p", type=Address, action="append",
                         help="Connect to the specific port")
 
     args = parser.parse_args()
