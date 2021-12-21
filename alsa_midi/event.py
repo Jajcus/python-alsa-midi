@@ -1,9 +1,10 @@
 
 from enum import IntEnum, IntFlag
-from typing import TYPE_CHECKING, Any, NewType, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, NewType, Optional, Union
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
+from .exceptions import StateError
 from .util import _ensure_4bit, _ensure_7bit
 
 if TYPE_CHECKING:
@@ -148,18 +149,25 @@ class Event:
     type = None
 
     flags: Optional[EventFlags]
+    tag: int
+    queue_id: Optional[int]
     time: Optional[RealTime]
+    tick: Optional[int]
+    source: Optional[Address]
+    dest: Optional[Address]
+    relative: Optional[bool]
+    raw_data: Optional[bytes]
 
     def __init__(self,
                  type: EventType,
                  *,
                  flags: Optional[Union[EventFlags, int]] = 0,
                  tag: int = 0,
-                 queue: Optional[int] = None,
+                 queue_id: Optional[int] = None,
                  time: Optional[RealTime] = None,
                  tick: Optional[int] = None,
-                 source: Optional[Tuple[int, int]] = None,
-                 dest: Optional[Tuple[int, int]] = None,
+                 source: Optional[AddressType] = None,
+                 dest: Optional[AddressType] = None,
                  relative: Optional[bool] = None,
                  raw_data: bytes = None,
                  ):
@@ -171,7 +179,7 @@ class Event:
             flags = None
         self.tag = tag
 
-        self.queue = queue
+        self.queue_id = queue_id
 
         if time is not None and tick is not None:
             raise ValueError("Either 'time' or 'tick' may be set, not both")
@@ -218,7 +226,7 @@ class Event:
             kwargs["type"] = EventType(event.type)
         return cls(flags=flags,
                    tag=event.flags,
-                   queue=event.queue,
+                   queue_id=event.queue,
                    time=ev_time,
                    tick=ev_tick,
                    relative=relative,
@@ -245,8 +253,8 @@ class Event:
                 event.queue = queue
             else:
                 event.queue = queue.queue_id
-        elif self.queue is not None:
-            event.queue = self.queue
+        elif self.queue_id is not None:
+            event.queue = self.queue_id
         else:
             event.queue = alsa.SND_SEQ_QUEUE_DIRECT
         assert self.time is None or self.tick is None
@@ -298,6 +306,9 @@ def _specialized_event_class(event_type):
 
 
 class ResultEventBase(Event):
+    event: int
+    result: int
+
     def __init__(self,
                  event: int,
                  result: int,
@@ -324,6 +335,10 @@ class ResultEventBase(Event):
 
 
 class NoteEventBase(Event):
+    note: int
+    channel: int
+    velocity: int
+
     def __init__(self,
                  note: int,
                  channel: int = 0,
@@ -355,6 +370,10 @@ class NoteEventBase(Event):
 
 
 class ControlChangeEventBase(Event):
+    channel: int
+    param: int
+    value: int
+
     def __init__(self,
                  channel: int,
                  param: int,
@@ -386,6 +405,9 @@ class ControlChangeEventBase(Event):
 
 
 class ParamChangeEventBase(Event):
+    channel: int
+    value: int
+
     def __init__(self,
                  channel: int,
                  value: int,
@@ -412,21 +434,23 @@ class ParamChangeEventBase(Event):
 
 
 class QueueControlEventBase(Event):
+    control_queue: int
+
     def __init__(self,
-                 control_queue: Optional[Union[int, 'Queue']] = None,
+                 control_queue: Union[int, 'Queue'],
                  **kwargs):
         assert self.type is not None
         super().__init__(self.type, **kwargs)
         if isinstance(control_queue, int):
             self.control_queue = control_queue
-        elif control_queue is not None:
+        elif control_queue.queue_id is not None:
             self.control_queue = control_queue.queue_id
         else:
-            self.control_queue = None
+            raise StateError("Queue already closed")
 
     def __repr__(self):
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue}>")
+            return (f"<{self.__class__.__name__} queue={self.control_queue}>")
         else:
             return (f"<{self.__class__.__name__}>")
 
@@ -437,9 +461,9 @@ class QueueControlEventBase(Event):
 
     def _to_alsa(self, **kwargs):
         event: _snd_seq_event_t = super()._to_alsa(**kwargs)
-        queue = self.control_queue
-        if queue is not None:
-            event.data.queue.queue_id = queue
+        queue_id = self.control_queue
+        if queue_id is not None:
+            event.data.queue.queue = queue_id
         return event
 
 
@@ -669,7 +693,7 @@ class SetQueuePositionTickEvent(QueueControlEventBase):
 
     def __repr__(self):
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue} tick={self.position}>")
+            return (f"<{self.__class__.__name__} queue={self.control_queue} tick={self.position}>")
         else:
             return (f"<{self.__class__.__name__} tick={self.position}>")
 
@@ -694,7 +718,7 @@ class SetQueuePositionTimeEvent(QueueControlEventBase):
 
     def __repr__(self):
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue} time={self.position}>")
+            return (f"<{self.__class__.__name__} queue={self.control_queue} time={self.position}>")
         else:
             return (f"<{self.__class__.__name__} time={self.position}>")
 
@@ -736,7 +760,8 @@ class SetQueueTempoEvent(QueueControlEventBase):
         tempo = self.midi_tempo
         bpm = self.bpm
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue} tempo={tempo} ({bpm} bpm)>")
+            return (f"<{self.__class__.__name__} queue={self.control_queue}"
+                    f" tempo={tempo} ({bpm} bpm)>")
         else:
             return (f"<{self.__class__.__name__} tempo={tempo} ({bpm} bpm)>")
 
@@ -776,7 +801,7 @@ class QueueSkewEvent(QueueControlEventBase):
 
     def __repr__(self):
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue}"
+            return (f"<{self.__class__.__name__} queue={self.control_queue}"
                     f" value={self.value} base={self.base}>")
         else:
             return (f"<{self.__class__.__name__} value={self.value} base={self.base}>")
@@ -806,7 +831,8 @@ class SyncPositionChangedEvent(QueueControlEventBase):
 
     def __repr__(self):
         if self.control_queue is not None:
-            return (f"<{self.__class__.__name__} queue={self.queue} position={self.position}>")
+            return (f"<{self.__class__.__name__} queue={self.control_queue}"
+                    f" position={self.position}>")
         else:
             return (f"<{self.__class__.__name__} position={self.position}>")
 

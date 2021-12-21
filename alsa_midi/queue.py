@@ -1,5 +1,5 @@
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from ._ffi import alsa, ffi
 from .event import EventType
@@ -11,6 +11,9 @@ if TYPE_CHECKING:
 
 
 class Queue:
+    client: Optional['SequencerClientBase']
+    queue_id: Optional[int]
+
     def __init__(self, client: 'SequencerClientBase', queue_id: int):
         self.client = client
         self.queue_id = queue_id
