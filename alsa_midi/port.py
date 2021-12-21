@@ -120,6 +120,16 @@ class Port:
         err = alsa.snd_seq_disconnect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
+    def get_info(self):
+        if self.client is None:
+            raise StateError("Already closed")
+        return self.client.get_port_info(self)
+
+    def set_info(self, info: 'PortInfo'):
+        if self.client is None:
+            raise StateError("Already closed")
+        return self.client.set_port_info(self, info)
+
 
 _snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)
 _snd_seq_port_info_t_p = NewType("_snd_seq_port_info_t", Tuple[_snd_seq_port_info_t])
@@ -144,7 +154,7 @@ class PortInfo:
     client_name: Optional[str]
 
     def __init__(self,
-                 client_id: int,
+                 client_id: int = 0,
                  port_id: int = None,
                  name: str = None,
                  capability: PortCaps = PortCaps._NONE,

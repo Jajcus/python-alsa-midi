@@ -1,8 +1,82 @@
 
 import pytest
 
-from alsa_midi import PortCaps, PortType, SequencerClient
+from alsa_midi import READ_PORT, PortCaps, PortType, SequencerClient
 from alsa_midi.port import PortInfo
+
+
+@pytest.mark.require_alsa_seq
+def test_get_port_info(alsa_seq_state):
+    client = SequencerClient("test")
+    alsa_seq_state.load()
+
+    # let's test it on the 'System' ports. They should always be there.
+
+    for (client_id, port_id), alsa_port in alsa_seq_state.ports.items():
+        info = client.get_port_info((client_id, port_id))
+
+        assert info.client_id == alsa_port.client_id
+        assert info.name == alsa_port.name
+
+        assert (PortCaps.WRITE in info.capability) == ("w" in alsa_port.flags.lower())
+        assert (PortCaps.SUBS_WRITE in info.capability) == ("W" in alsa_port.flags)
+        assert (PortCaps.READ in info.capability) == ("r" in alsa_port.flags.lower())
+        assert (PortCaps.SUBS_READ in info.capability) == ("R" in alsa_port.flags)
+
+        assert info.read_use == len(alsa_port.connected_to)
+        assert info.write_use == len(alsa_port.connected_from)
+
+
+def test_get_own_port_info():
+    client = SequencerClient("test")
+
+    p1 = client.create_port("p1")
+    p2 = client.create_port("p2")
+
+    info1 = client.get_port_info(p1)
+    info2 = client.get_port_info(p2.port_id)
+    info1a = p1.get_info()
+
+    assert info1.client_id == client.client_id
+    assert info1.port_id == p1.port_id
+    assert info1.name == "p1"
+
+    assert info2.client_id == client.client_id
+    assert info2.port_id == p2.port_id
+    assert info2.name == "p2"
+
+    assert info1a.client_id == client.client_id
+    assert info1a.port_id == p1.port_id
+    assert info1a.name == "p1"
+
+
+@pytest.mark.require_alsa_seq
+def test_set_port_info(alsa_seq_state):
+    client = SequencerClient("test")
+
+    p1 = client.create_port("p1")
+
+    info = PortInfo(name="p1 changed",
+                    capability=READ_PORT,
+                    type=PortType.SPECIFIC,
+                    midi_channels=5,
+                    midi_voices=6,
+                    synth_voices=7,
+                    timestamping=True,
+                    timestamp_real=True)
+
+    p1.set_info(info)
+
+    alsa_seq_state.load()
+
+    alsa_port = alsa_seq_state.ports[client.client_id, p1.port_id]
+
+    assert alsa_port.name == "p1 changed"
+
+    assert "w" not in alsa_port.flags.lower()
+    assert "W" not in alsa_port.flags
+    assert "r" in alsa_port.flags.lower()
+    assert "R" in alsa_port.flags
 
 
 @pytest.mark.require_alsa_seq

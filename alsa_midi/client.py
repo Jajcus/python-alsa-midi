@@ -8,7 +8,7 @@ from functools import partial
 from typing import Any, Awaitable, Callable, List, NewType, Optional, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
-from .address import AddressType
+from .address import Address, AddressType
 from .event import Event
 from .exceptions import StateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
@@ -290,6 +290,36 @@ class SequencerClientBase:
         finally:
             alsa.snd_seq_client_info_free(info)
         return result
+
+    def get_port_info(self, port: Union[int, AddressType]) -> PortInfo:
+        if isinstance(port, int):
+            client_id = self.client_id
+            port_id = port
+        else:
+            client_id, port_id = Address(port)
+        info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+        err = alsa.snd_seq_port_info_malloc(info_p)
+        _check_alsa_error(err)
+        info = info_p[0]
+        try:
+            if client_id == self.client_id:
+                err = alsa.snd_seq_get_port_info(self.handle, port_id, info)
+            else:
+                err = alsa.snd_seq_get_any_port_info(self.handle, client_id, port_id, info)
+            _check_alsa_error(err)
+            result = PortInfo._from_alsa(info)
+        finally:
+            alsa.snd_seq_port_info_free(info)
+        return result
+
+    def set_port_info(self, port: Union[int, Port], info: PortInfo):
+        if isinstance(port, int):
+            port_id = port
+        else:
+            port_id = port.port_id
+        alsa_info = info._to_alsa()
+        err = alsa.snd_seq_set_port_info(self.handle, port_id, alsa_info)
+        _check_alsa_error(err)
 
     @overload
     def query_next_port(self, client_id: int, previous: PortInfo
