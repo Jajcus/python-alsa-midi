@@ -571,6 +571,8 @@ class SequencerClientBase:
 
 class SequencerClient(SequencerClientBase):
     def __init__(self, *args, **kwargs):
+        if "mode" in kwargs and not kwargs["mode"] & OpenMode.NONBLOCK:
+            raise ValueError("NONBLOCK open mode must be used")
         super().__init__(*args, **kwargs)
         self._read_poll = select.poll()
         self._read_poll.register(self._fd, select.POLLIN)
@@ -651,6 +653,11 @@ class SequencerClient(SequencerClientBase):
 
 
 class AsyncSequencerClient(SequencerClientBase):
+    def __init__(self, *args, **kwargs):
+        if "mode" in kwargs and not kwargs["mode"] & OpenMode.NONBLOCK:
+            raise ValueError("NONBLOCK open mode must be used")
+        super().__init__(*args, **kwargs)
+
     async def aclose(self):
         self.close()
 

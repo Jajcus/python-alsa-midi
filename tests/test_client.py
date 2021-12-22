@@ -3,7 +3,9 @@ import errno
 
 import pytest
 
-from alsa_midi import ALSAError, ClientInfo, ClientType, SequencerClient, StateError, alsa, ffi
+from alsa_midi import (ALSAError, AsyncSequencerClient, ClientInfo, ClientType, SequencerClient,
+                       StateError, alsa, ffi)
+from alsa_midi.client import SequencerClientBase
 
 
 @pytest.mark.require_no_alsa_seq
@@ -58,6 +60,18 @@ def test_client_open_del_alsa(alsa_seq_state):
 
     alsa_seq_state.load()
     assert client_id not in alsa_seq_state.clients
+
+
+@pytest.mark.require_alsa_seq
+def test_open_blocking():
+    with pytest.raises(ValueError):
+        SequencerClient("test", mode=0)
+    with pytest.raises(ValueError):
+        AsyncSequencerClient("test", mode=0)
+
+    # allowed, but stupid
+    client = SequencerClientBase("test", mode=0)
+    client.close()
 
 
 def test_client_info():
