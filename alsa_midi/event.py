@@ -213,7 +213,7 @@ class Event:
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
         flags = event.flags
         if (flags & EventFlags.TIME_STAMP_MASK) == EventFlags.TIME_STAMP_REAL:
-            ev_time = RealTime(event.time.time.tv_sec, event.time.tim.tv_nsec)
+            ev_time = RealTime(event.time.time.tv_sec, event.time.time.tv_nsec)
         else:
             ev_time = None
         if (flags & EventFlags.TIME_STAMP_MASK) == EventFlags.TIME_STAMP_TICK:
