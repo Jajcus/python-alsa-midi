@@ -161,12 +161,51 @@ class SequencerClientBase:
     def create_port(self,
                     name: str,
                     caps: PortCaps = RW_PORT,
-                    port_type: PortType = DEFAULT_PORT_TYPE,
+                    type: PortType = DEFAULT_PORT_TYPE,
+                    *,
+                    port_id: Optional[int] = None,
+                    midi_channels: Optional[int] = None,
+                    midi_voices: Optional[int] = None,
+                    synth_voices: Optional[int] = None,
+                    timestamping: Optional[bool] = None,
+                    timestamp_real: Optional[bool] = None,
+                    timestamp_queue: Optional[Union[Queue, int]] = None,
                     ) -> Port:
         self._check_handle()
-        port = alsa.snd_seq_create_simple_port(self.handle,
-                                               name.encode("utf-8"),
-                                               caps, port_type)
+        extra = [port_id, midi_channels, midi_voices, synth_voices,
+                 timestamping, timestamp_real, timestamp_queue]
+        if all(x is None for x in extra):
+            port = alsa.snd_seq_create_simple_port(self.handle,
+                                                   name.encode(),
+                                                   caps, type)
+        else:
+            info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+            err = alsa.snd_seq_port_info_malloc(info_p)
+            _check_alsa_error(err)
+            info = info_p[0]
+            alsa.snd_seq_port_info_set_name(info, name.encode())
+            alsa.snd_seq_port_info_set_capability(info, caps)
+            alsa.snd_seq_port_info_set_type(info, type)
+            if port_id is not None:
+                alsa.snd_seq_port_info_set_port(info, port_id)
+                alsa.snd_seq_port_info_set_port_specified(info, 1)
+            if midi_channels is not None:
+                alsa.snd_seq_port_info_set_midi_channels(info, midi_channels)
+            if midi_voices is not None:
+                alsa.snd_seq_port_info_set_midi_voices(info, midi_voices)
+            if synth_voices is not None:
+                alsa.snd_seq_port_info_set_synth_voices(info, synth_voices)
+            if timestamping is not None:
+                alsa.snd_seq_port_info_set_timestamping(info, int(timestamping))
+            if timestamp_real is not None:
+                alsa.snd_seq_port_info_set_timestamp_real(info, int(timestamp_real))
+            if timestamp_queue is not None:
+                if isinstance(timestamp_queue, int):
+                    queue_id = timestamp_queue
+                else:
+                    queue_id = timestamp_queue.queue_id
+                alsa.snd_seq_port_info_set_timestamp_queue(info, queue_id)
+            port = alsa.snd_seq_create_port(self.handle, info)
         _check_alsa_error(port)
         return Port(self, port)
 
