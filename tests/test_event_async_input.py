@@ -59,4 +59,4 @@ async def test_event_input(asyncio_latency_check):
     player.wait()
     await asyncio_latency_check.cont()
 
-    assert (await asyncio_latency_check.get_max()) < 0.05
+    assert (await asyncio_latency_check.get_max()) < 0.4

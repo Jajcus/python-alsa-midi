@@ -12,7 +12,7 @@ async def test_client_drain_output_nothing(asyncio_latency_check):
     client = AsyncSequencerClient("test")
     await client.drain_output()
     await client.aclose()
-    assert (await asyncio_latency_check.get_max() < 0.05)
+    assert (await asyncio_latency_check.get_max() < 0.1)
 
 
 @pytest.mark.require_alsa_seq
@@ -21,7 +21,7 @@ async def test_client_drop_output_nothing(asyncio_latency_check):
     client = AsyncSequencerClient("test")
     client.drop_output()
     await client.aclose()
-    assert (await asyncio_latency_check.get_max() < 0.05)
+    assert (await asyncio_latency_check.get_max() < 0.1)
 
 
 @pytest.mark.require_alsa_seq
@@ -65,4 +65,4 @@ async def test_event_output(aseqdump, asyncio_latency_check):
     aseqdump.close()
     await client.aclose()
 
-    assert (await asyncio_latency_check.get_max() < 0.1)
+    assert (await asyncio_latency_check.get_max() < 0.4)
