@@ -1,4 +1,5 @@
 
+import asyncio
 import os
 import subprocess
 import time
@@ -15,13 +16,13 @@ DATA_DIR = os.path.join(TESTS_DIR, "data")
 @pytest.mark.require_tool("aplaymidi")
 @pytest.mark.require_alsa_seq
 @pytest.mark.asyncio
-async def test_event_input():
+async def test_event_input(asyncio_latency_check):
     client = AsyncSequencerClient("test")
     port = client.create_port("input", WRITE_PORT)
 
     # flush any 'port connect' events that could been emitted by some session
     # managers auto-connecting stuff
-    time.sleep(0.2)
+    await asyncio.sleep(0.2)
     client.drop_input()
 
     # should fail with EAGAIN
@@ -35,9 +36,11 @@ async def test_event_input():
     assert time.monotonic() - start >= 0.5
 
     # play a midi file to our port
+    await asyncio_latency_check.stop()
     filename = os.path.join(DATA_DIR, "c_major.mid")
     cmd = ["aplaymidi", "-p", str(Address(port)), "-d", "0", filename]
     player = subprocess.Popen(cmd)
+    await asyncio_latency_check.cont()
 
     events = []
     # 1 port subscribe, 8 note-on,  8 note-off, 1 port unsubscribe
@@ -52,4 +55,8 @@ async def test_event_input():
     assert event is None
     assert time.monotonic() - start >= 0.5
 
+    await asyncio_latency_check.stop()
     player.wait()
+    await asyncio_latency_check.cont()
+
+    assert (await asyncio_latency_check.get_max()) < 0.05

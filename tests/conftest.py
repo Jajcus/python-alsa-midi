@@ -1,8 +1,10 @@
 
+import asyncio
 import os
 import re
 import subprocess
 import sys
+from statistics import mean
 from typing import Dict, List, Optional, Tuple
 
 import pytest
@@ -367,3 +369,125 @@ def aseqdump():
                                stderr=subprocess.DEVNULL,
                                stdin=subprocess.DEVNULL)
     return Aseqdump(process)
+
+
+@pytest.fixture
+async def asyncio_latency_check(event_loop):
+    class Latency:
+        def __init__(self):
+            self.start_time = event_loop.time()
+            self.min = None
+            self.max = None
+            self.samples = []
+            self.cond = asyncio.Condition()
+            self.should_pause = False
+            self.should_continue = False
+            self.should_stop = False
+            self.paused = False
+            self.stopped = False
+
+        def add_sample(self, value):
+            self.samples.append(value)
+            if not self.min or value < self.min:
+                self.min = value
+            if not self.max or value > self.max:
+                self.max = value
+
+        def is_paused(self):
+            return self.paused
+
+        def is_running(self):
+            return not self.paused
+
+        async def pause(self):
+            async with self.cond:
+                if self.paused:
+                    return
+                self.should_pause = True
+                self.cond.notify()
+            async with self.cond:
+                await self.cond.wait_for(self.is_paused)
+
+        async def cont(self):
+            async with self.cond:
+                if not self.paused:
+                    return False
+                self.should_continue = True
+                self.cond.notify()
+            async with self.cond:
+                await self.cond.wait_for(self.is_running)
+
+        async def stop(self):
+            if self.stopped:
+                return
+            await self.cont()
+            self.should_stop = True
+            async with self.cond:
+                await self.cond.wait_for(lambda: self.stopped)
+
+        async def _loop(self, step=0.01):
+            try:
+                while True:
+                    async with self.cond:
+                        if self.should_pause:
+                            self.should_pause = False
+                            self.paused = True
+                            self.cond.notify()
+                    async with self.cond:
+                        if self.paused:
+                            await self.cond.wait_for(lambda: self.should_continue)
+                            self.should_continue = False
+                            self.paused = False
+                            self.cond.notify()
+                    before = event_loop.time()
+                    await asyncio.sleep(step)
+                    after = event_loop.time()
+                    diff = after - before + step
+                    async with self.cond:
+                        latency.add_sample(diff)
+                        self.cond.notify()
+                    if self.should_stop:
+                        # only after at least one sample has been gathered
+                        break
+            except asyncio.CancelledError:
+                pass
+            self.stopped = True
+
+        async def get_min(self):
+            if self.min is not None:
+                return self.min
+            async with self.cond:
+                await self.cond.wait_for(lambda: self.min is not None)
+            return self.min
+
+        async def get_max(self):
+            if self.max is not None:
+                return self.max
+            async with self.cond:
+                await self.cond.wait_for(lambda: self.max is not None)
+            return self.max
+
+        @property
+        def avg(self):
+            return mean(self.samples)
+
+        async def get_avg(self):
+            if self.samples:
+                return self.avg
+            async with self.cond:
+                await self.cond.wait_for(lambda: self.samples)
+            return self.avg
+
+    latency = Latency()
+
+    task = asyncio.create_task(latency._loop())
+
+    yield latency
+
+    await asyncio.wait_for(latency.stop(), 1)
+
+    task.cancel()
+    await task
+
+    assert latency.max is not None
+    assert latency.max < 0.5, f"Measured latency >= 0.5, samples: {latency.samples!r}"

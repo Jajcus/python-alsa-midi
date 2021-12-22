@@ -1,5 +1,5 @@
 
-import time
+import asyncio
 
 import pytest
 
@@ -8,23 +8,25 @@ from alsa_midi import READ_PORT, Address, AsyncSequencerClient, NoteOffEvent, No
 
 @pytest.mark.require_alsa_seq
 @pytest.mark.asyncio
-async def test_client_drain_output_nothing():
+async def test_client_drain_output_nothing(asyncio_latency_check):
     client = AsyncSequencerClient("test")
     await client.drain_output()
     await client.aclose()
+    assert (await asyncio_latency_check.get_max() < 0.05)
 
 
 @pytest.mark.require_alsa_seq
 @pytest.mark.asyncio
-async def test_client_drop_output_nothing():
+async def test_client_drop_output_nothing(asyncio_latency_check):
     client = AsyncSequencerClient("test")
     client.drop_output()
     await client.aclose()
+    assert (await asyncio_latency_check.get_max() < 0.05)
 
 
 @pytest.mark.require_alsa_seq
 @pytest.mark.asyncio
-async def test_event_output(aseqdump):
+async def test_event_output(aseqdump, asyncio_latency_check):
 
     # prepare the client and port
     client = AsyncSequencerClient("test")
@@ -52,7 +54,7 @@ async def test_event_output(aseqdump):
         our_events = [line for addr, line in aseqdump.output if addr == Address(port)]
         if len(our_events) >= 2:
             break
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
 
     # verify output
     assert len(our_events) == 2
@@ -62,3 +64,5 @@ async def test_event_output(aseqdump):
 
     aseqdump.close()
     await client.aclose()
+
+    assert (await asyncio_latency_check.get_max() < 0.1)
