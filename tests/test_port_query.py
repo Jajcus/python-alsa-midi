@@ -27,6 +27,7 @@ def test_get_port_info(alsa_seq_state):
         assert info.write_use == len(alsa_port.connected_from)
 
 
+@pytest.mark.require_alsa_seq
 def test_get_own_port_info():
     client = SequencerClient("test")
 
