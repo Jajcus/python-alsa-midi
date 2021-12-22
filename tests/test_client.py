@@ -1,4 +1,6 @@
 
+import errno
+
 import pytest
 
 from alsa_midi import ALSAError, ClientInfo, ClientType, SequencerClient, StateError, alsa, ffi
@@ -161,3 +163,84 @@ def test_query_next_client(alsa_seq_state):
     assert len(all_infos) == len(alsa_seq_state.clients)
 
     client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_port_subscribe_unsubscribe(alsa_seq_state):
+    c1 = SequencerClient("c1")
+    p11 = c1.create_port("p11")
+    p12 = c1.create_port("p12")
+    p13 = c1.create_port("p13")
+    c2 = SequencerClient("c2")
+    p21 = c1.create_port("p21")
+    p22 = c1.create_port("p22")
+
+    try:
+        c1.subscribe_port(p13, p22)
+
+        with pytest.raises(ALSAError) as err:
+            c1.subscribe_port(p13, p22)
+        assert err.value.errnum == -errno.EBUSY
+
+        c1.subscribe_port(p13, p21)
+
+        with pytest.raises(ALSAError) as err:
+            c1.subscribe_port(p13, p21)
+        assert err.value.errnum == -errno.EBUSY
+
+        c1.subscribe_port(p11, p22)
+        c1.subscribe_port(p21, p12)
+
+        # FIXME: test the optional arguments to subscribe_port
+
+        alsa_seq_state.load()
+        ap11 = alsa_seq_state.ports[p11.client_id, p11.port_id]
+        ap12 = alsa_seq_state.ports[p12.client_id, p12.port_id]
+        ap13 = alsa_seq_state.ports[p13.client_id, p13.port_id]
+        ap21 = alsa_seq_state.ports[p21.client_id, p21.port_id]
+        ap22 = alsa_seq_state.ports[p22.client_id, p22.port_id]
+
+        assert set(ap11.connected_to) == {(p22.client_id, p22.port_id)}
+        assert set(ap11.connected_from) == set()
+        assert set(ap12.connected_to) == set()
+        assert set(ap12.connected_from) == {(p21.client_id, p21.port_id)}
+        assert set(ap13.connected_to) == {(p21.client_id, p21.port_id),
+                                          (p22.client_id, p22.port_id)}
+        assert set(ap13.connected_from) == set()
+
+        assert set(ap21.connected_to) == {(p12.client_id, p12.port_id)}
+        assert set(ap21.connected_from) == {(p13.client_id, p13.port_id)}
+        assert set(ap22.connected_to) == set()
+        assert set(ap22.connected_from) == {(p11.client_id, p11.port_id),
+                                            (p13.client_id, p13.port_id)}
+
+        c1.unsubscribe_port(p11, p22)
+        c1.unsubscribe_port(p21, p12)
+
+        with pytest.raises(ALSAError) as err:
+            c1.unsubscribe_port(p21, p12)
+        assert err.value.errnum == -errno.ENOENT
+
+        alsa_seq_state.load()
+        ap11 = alsa_seq_state.ports[p11.client_id, p11.port_id]
+        ap12 = alsa_seq_state.ports[p12.client_id, p12.port_id]
+        ap13 = alsa_seq_state.ports[p13.client_id, p13.port_id]
+        ap21 = alsa_seq_state.ports[p21.client_id, p21.port_id]
+        ap22 = alsa_seq_state.ports[p22.client_id, p22.port_id]
+
+        assert set(ap11.connected_to) == set()
+        assert set(ap11.connected_from) == set()
+        assert set(ap12.connected_to) == set()
+        assert set(ap12.connected_from) == set()
+        assert set(ap13.connected_to) == {(p21.client_id, p21.port_id),
+                                          (p22.client_id, p22.port_id)}
+        assert set(ap13.connected_from) == set()
+
+        assert set(ap21.connected_to) == set()
+        assert set(ap21.connected_from) == {(p13.client_id, p13.port_id)}
+        assert set(ap22.connected_to) == set()
+        assert set(ap22.connected_from) == {(p13.client_id, p13.port_id)}
+
+    finally:
+        c2.close()
+        c1.close()

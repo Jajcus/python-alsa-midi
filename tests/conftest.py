@@ -127,12 +127,13 @@ class AlsaQueueState:
 
 PROC_CLIENT_LINE_RE = re.compile(r'Client\s+(\d+)\s*:\s*\"([^"]*)"\s+\[([^\]]*)\]')
 PROC_PORT_LINE_RE = re.compile(r'\s+Port\s+(\d+)\s*:\s*\"([^"]*)"\s+\(([^\)]*)\)')
-PROC_CONN_TO_LINE_RE = re.compile(r'\s+Connecting To:\s*([\d:, ]+)')
-PROC_CONN_FROM_LINE_RE = re.compile(r'\s+Connected From:\s*([\d:, ]+)')
+PROC_CONN_TO_LINE_RE = re.compile(r'\s+Connecting To:\s*(\S.*)$')
+PROC_CONN_FROM_LINE_RE = re.compile(r'\s+Connected From:\s*(\S.*)$')
 
 
 def parse_port_list(string: str) -> List[Tuple[int, int]]:
     port_list = [p.strip() for p in string.split(",")]
+    port_list = [p.split("[", 1)[0] for p in port_list]
     port_list = [p.split(":", 1) for p in port_list]
     port_list = [(int(p[0]), int(p[1])) for p in port_list]
     return port_list

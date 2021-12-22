@@ -1,9 +1,11 @@
 
+import errno
 from typing import Any
 
 import pytest
 
-from alsa_midi import Address, Port, PortCaps, PortInfo, PortType, SequencerClient, alsa, ffi
+from alsa_midi import (Address, ALSAError, Port, PortCaps, PortInfo, PortType, SequencerClient,
+                       alsa, ffi)
 from alsa_midi.port import get_port_info_sort_key
 
 
@@ -70,6 +72,47 @@ def test_port_create_del_alsa(alsa_seq_state):
 
     alsa_seq_state.load()
     assert (client_id, port_id) not in alsa_seq_state.ports
+
+
+@pytest.mark.require_alsa_seq
+def test_port_connect_disconnect(alsa_seq_state):
+    c1 = SequencerClient("c1")
+    p11 = c1.create_port("p11")
+    c2 = SequencerClient("c1")
+    p21 = c2.create_port("p21")
+    p22 = c2.create_port("p22")
+
+    try:
+        p11.connect_to(p21)
+        p11.connect_from(p22)
+
+        with pytest.raises(ALSAError) as err:
+            p11.connect_from(p22)
+        assert err.value.errnum == -errno.EBUSY
+
+        alsa_seq_state.load()
+        ap11 = alsa_seq_state.ports[p11.client_id, p11.port_id]
+        ap22 = alsa_seq_state.ports[p22.client_id, p22.port_id]
+
+        assert (p21.client_id, p21.port_id) in ap11.connected_to
+        assert (p22.client_id, p22.port_id) in ap11.connected_from
+        assert (p11.client_id, p11.port_id) in ap22.connected_to
+
+        p22.disconnect_to((p11.client_id, p11.port_id))
+
+        with pytest.raises(ALSAError) as err:
+            p22.disconnect_to((p11.client_id, p11.port_id))
+        assert err.value.errnum == -errno.ENOENT
+
+        alsa_seq_state.load()
+        ap11 = alsa_seq_state.ports[p11.client_id, p11.port_id]
+        ap22 = alsa_seq_state.ports[p22.client_id, p22.port_id]
+
+        assert (p21.client_id, p21.port_id) in ap11.connected_to
+        assert (p22.client_id, p22.port_id) not in ap11.connected_from
+    finally:
+        c1.close()
+        c2.close()
 
 
 def test_port_as_address():

@@ -471,6 +471,64 @@ class SequencerClientBase:
 
         return result
 
+    def _subunsub_port(self, func,
+                       sender: AddressType, dest: AddressType, *,
+                       queue: Optional[Union[Queue, int]] = None,
+                       exclusive: bool = False,
+                       time_update: bool = False,
+                       time_real: bool = False):
+        sender = Address(sender)
+        dest = Address(dest)
+        if queue is None or isinstance(queue, int):
+            queue_id = queue
+        else:
+            queue_id = queue.queue_id
+        sub_p = ffi.new("snd_seq_port_subscribe_t **")
+        err = alsa.snd_seq_port_subscribe_malloc(sub_p)
+        _check_alsa_error(err)
+        sub = sub_p[0]
+        try:
+            addr = ffi.new("snd_seq_addr_t *")
+            addr.client, addr.port = sender.client_id, sender.port_id
+            alsa.snd_seq_port_subscribe_set_sender(sub, addr)
+            addr.client, addr.port = dest.client_id, dest.port_id
+            alsa.snd_seq_port_subscribe_set_dest(sub, addr)
+            if queue_id is not None:
+                alsa.snd_seq_port_subscribe_set_queue(sub, queue_id)
+            alsa.snd_seq_port_subscribe_set_exclusive(sub, int(exclusive))
+            alsa.snd_seq_port_subscribe_set_time_update(sub, int(time_update))
+            alsa.snd_seq_port_subscribe_set_time_real(sub, int(time_real))
+            err = func(self.handle, sub)
+            _check_alsa_error(err)
+        finally:
+            alsa.snd_seq_port_subscribe_free(sub)
+
+    def subscribe_port(self, sender: AddressType, dest: AddressType, *,
+                       queue: Optional[Union[Queue, int]] = None,
+                       exclusive: bool = False,
+                       time_update: bool = False,
+                       time_real: bool = False):
+        self._check_handle()
+        return self._subunsub_port(alsa.snd_seq_subscribe_port,
+                                   sender, dest,
+                                   queue=queue,
+                                   exclusive=exclusive,
+                                   time_update=time_update,
+                                   time_real=time_real)
+
+    def unsubscribe_port(self, sender: AddressType, dest: AddressType, *,
+                         queue: Optional[Union[Queue, int]] = None,
+                         exclusive: bool = False,
+                         time_update: bool = False,
+                         time_real: bool = False):
+        self._check_handle()
+        return self._subunsub_port(alsa.snd_seq_unsubscribe_port,
+                                   sender, dest,
+                                   queue=queue,
+                                   exclusive=exclusive,
+                                   time_update=time_update,
+                                   time_real=time_real)
+
 
 class SequencerClient(SequencerClientBase):
     def __init__(self, *args, **kwargs):
