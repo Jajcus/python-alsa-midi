@@ -543,7 +543,7 @@ class ExternalDataEventBase(Event):
 
     @classmethod
     def _from_alsa(cls, event: _snd_seq_event_t, **kwargs):
-        data = bytes(ffi.buffer(event.data.ext.data, event.data.ext.len))
+        data = bytes(ffi.buffer(event.data.ext.ptr, event.data.ext.len))
         kwargs["data"] = data
         return super()._from_alsa(event, **kwargs)
 
@@ -551,7 +551,7 @@ class ExternalDataEventBase(Event):
         event: _snd_seq_event_t = super()._to_alsa(**kwargs)
         event.flags |= EventFlags.EVENT_LENGTH_VARIABLE
         event.data.ext.len = len(self.data)
-        event.data.ext.data = ffi.from_buffer(self.data)
+        event.data.ext.ptr = ffi.from_buffer(self.data)
         return event
 
 
