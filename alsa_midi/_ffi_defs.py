@@ -861,7 +861,7 @@ enum {
 
 extern const unsigned int snd_seq_event_types[];
 
-/*******************************************************************************************************/
+/*************************************************************************************************/
 
 /* seqmid.h */
 
@@ -887,7 +887,26 @@ int snd_seq_parse_address(snd_seq_t *seq, snd_seq_addr_t *addr, const char *str)
 int snd_seq_reset_pool_output(snd_seq_t *seq);
 int snd_seq_reset_pool_input(snd_seq_t *seq);
 
-/*******************************************************************************************************/
+/*************************************************************************************************/
+
+/* seq_midi_event.h */
+
+typedef struct snd_midi_event snd_midi_event_t;
+
+int snd_midi_event_new(size_t bufsize, snd_midi_event_t **rdev);
+int snd_midi_event_resize_buffer(snd_midi_event_t *dev, size_t bufsize);
+void snd_midi_event_free(snd_midi_event_t *dev);
+void snd_midi_event_init(snd_midi_event_t *dev);
+void snd_midi_event_reset_encode(snd_midi_event_t *dev);
+void snd_midi_event_reset_decode(snd_midi_event_t *dev);
+void snd_midi_event_no_status(snd_midi_event_t *dev, int on);
+long snd_midi_event_encode(snd_midi_event_t *dev, const unsigned char *buf,
+                           long count, snd_seq_event_t *ev);
+int snd_midi_event_encode_byte(snd_midi_event_t *dev, int c, snd_seq_event_t *ev);
+long snd_midi_event_decode(snd_midi_event_t *dev, unsigned char *buf, long count,
+                           const snd_seq_event_t *ev);
+
+/*************************************************************************************************/
 
 /* poll.h */
 

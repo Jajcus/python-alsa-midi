@@ -1,6 +1,6 @@
 
 from enum import IntEnum, IntFlag
-from typing import TYPE_CHECKING, Any, NewType, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterable, NewType, Optional, Union
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -159,7 +159,7 @@ class Event:
     raw_data: Optional[bytes]
 
     def __init__(self,
-                 type: EventType,
+                 type: Optional[EventType],
                  *,
                  flags: Optional[Union[EventFlags, int]] = 0,
                  tag: int = 0,
@@ -235,14 +235,13 @@ class Event:
                    raw_data=raw_data,
                    **kwargs)
 
-    def _to_alsa(self, *,
+    def _to_alsa(self, event: _snd_seq_event_t, *,
                  queue: Union['Queue', int] = None,
                  port: Union['Port', int] = None,
                  dest: AddressType = None
                  ) -> _snd_seq_event_t:
-        event: _snd_seq_event_t = ffi.new("snd_seq_event_t *")
-        assert self.type is not None
-        event.type = int(self.type)
+        if self.type is not None:
+            event.type = int(self.type)
         if self.flags is not None:
             flags = self.flags
         else:
@@ -297,6 +296,26 @@ class Event:
         return event
 
 
+class MidiBytesEvent(Event):
+    midi_bytes: bytes
+
+    def __init__(self,
+                 midi_bytes: Union[bytes, Iterable[int]],
+                 **kwargs):
+        super().__init__(None, **kwargs)
+        self.midi_bytes = bytes(midi_bytes)
+
+    def __repr__(self):
+        length = self.midi_bytes
+        if len(length) < 32:
+            hex_bytes = " ".join(f"{b:02X}" for b in self.midi_bytes)
+        else:
+            hex_bytes = " ".join(f"{b:02X}" for b in self.midi_bytes[:2])
+            hex_bytes += " .. <{length - 4} more> .. "
+            hex_bytes = " ".join(f"{b:02X}" for b in self.midi_bytes[-2:])
+        return (f"<{self.__class__.__name__} {hex_bytes}>")
+
+
 def _specialized_event_class(event_type):
     def decorator(cls):
         cls.type = event_type
@@ -327,8 +346,8 @@ class ResultEventBase(Event):
         kwargs["result"] = event.data.result.result
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.result.event = self.event
         event.data.result.result = self.result
         return event
@@ -361,8 +380,8 @@ class NoteEventBase(Event):
         kwargs["velocity"] = event.data.note.velocity
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.note.note = self.note
         event.data.note.channel = self.channel
         event.data.note.velocity = self.velocity
@@ -396,8 +415,8 @@ class ControlChangeEventBase(Event):
         kwargs["value"] = event.data.control.value
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.result.channel = self.channel
         event.data.result.param = self.param
         event.data.result.value = self.value
@@ -426,8 +445,8 @@ class ParamChangeEventBase(Event):
         kwargs["value"] = event.data.control.value
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.result.channel = self.channel
         event.data.result.value = self.value
         return event
@@ -459,8 +478,8 @@ class QueueControlEventBase(Event):
         kwargs["control_queue"] = event.data.queue.queue
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         queue_id = self.control_queue
         if queue_id is not None:
             event.data.queue.queue = queue_id
@@ -485,8 +504,8 @@ class AddressEventBase(Event):
         kwargs["addr"] = Address(event.data.addr.client, event.data.addr.port)
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.event.data.addr.client = self.addr.client_id
         event.event.data.addr.port = self.addr.port_id
         return event
@@ -516,8 +535,8 @@ class ConnectEventBase(Event):
                                          event.data.connect.dest.port)
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.event.data.connect.sender.client = self.connect_sender.client_id
         event.event.data.connect.sender.port = self.connect_sender.port_id
         event.event.data.connect.dest.client = self.connect_dest.client_id
@@ -547,8 +566,8 @@ class ExternalDataEventBase(Event):
         kwargs["data"] = data
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.flags |= EventFlags.EVENT_LENGTH_VARIABLE
         event.data.ext.len = len(self.data)
         event.data.ext.ptr = ffi.from_buffer(self.data)
@@ -589,8 +608,8 @@ class NoteEvent(NoteEventBase):
         kwargs["duration"] = event.data.note.duration
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.note.off_velocity = self.off_velocity
         event.data.note.duration = self.duration
         return event
@@ -702,8 +721,8 @@ class SetQueuePositionTickEvent(QueueControlEventBase):
         kwargs["position"] = event.data.queue.time.tick
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.queue.time.tick = self.position
         return event
 
@@ -728,8 +747,8 @@ class SetQueuePositionTimeEvent(QueueControlEventBase):
                                   event.data.queue.param.time.time.tv_nsec)
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.queue.param.time.time.tv_sec = self.position.seconds
         event.data.queue.param.time.time.tv_nsec = self.position.nanoseconds
         return event
@@ -770,8 +789,8 @@ class SetQueueTempoEvent(QueueControlEventBase):
         kwargs["midi_tempo"] = event.data.queue.param.value
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.queue.param.value = self.midi_tempo
         return event
 
@@ -812,8 +831,8 @@ class QueueSkewEvent(QueueControlEventBase):
         kwargs["base"] = event.data.queue.param.skew.base
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.queue.param.skew.value = self.value
         event.data.queue.param.skew.base = self.base
         return event
@@ -841,8 +860,8 @@ class SyncPositionChangedEvent(QueueControlEventBase):
         kwargs["position"] = event.data.queue.param.position
         return super()._from_alsa(event, **kwargs)
 
-    def _to_alsa(self, **kwargs):
-        event: _snd_seq_event_t = super()._to_alsa(**kwargs)
+    def _to_alsa(self, event: _snd_seq_event_t, **kwargs):
+        super()._to_alsa(event, **kwargs)
         event.data.queue.param.position = self.position
         return event
 
@@ -946,7 +965,7 @@ class UserVar3Event(ExternalDataEventBase):
 
 __all__ = [
         "RealTime",
-        "EventType", "EventFlags", "Event",
+        "EventType", "EventFlags", "Event", "MidiBytesEvent",
         "NoteEventBase",
         "NoteOnEvent", "NoteOffEvent"
         ]

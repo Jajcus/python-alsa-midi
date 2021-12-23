@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, List, NewType, Optional, Tuple, Uni
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
-from .event import Event
+from .event import Event, EventType, MidiBytesEvent, _snd_seq_event_t
 from .exceptions import StateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
                    WRITE_PORT_PREFERRED_TYPES, Port, PortCaps, PortInfo, PortType,
@@ -19,6 +19,7 @@ from .util import _check_alsa_error
 
 _snd_seq_t = NewType("_snd_seq_t", object)
 _snd_seq_t_p = NewType("_snd_seq_t_p", Tuple[_snd_seq_t])
+_snd_midi_event_t = NewType("_snd_midi_event_t", object)
 
 
 class StreamOpenType(IntFlag):
@@ -107,6 +108,7 @@ class SequencerClientBase:
     handle: _snd_seq_t
     _handle_p: _snd_seq_t_p
     _fd: int = -1
+    _event_parser: Optional[_snd_midi_event_t] = None
 
     def __init__(
             self,
@@ -251,14 +253,57 @@ class SequencerClientBase:
         _check_alsa_error(result)
         return event
 
+    def _prepare_event(self,
+                       event: Event,
+                       queue: Union['Queue', int] = None,
+                       port: Union['Port', int] = None,
+                       dest: AddressType = None,
+                       remainder: Optional[Any] = None) -> Tuple[_snd_seq_event_t, Any]:
+
+        if not isinstance(event, MidiBytesEvent):
+            alsa_event: _snd_seq_event_t = ffi.new("snd_seq_event_t *")
+            event._to_alsa(alsa_event, queue=queue, port=port, dest=dest)
+            return alsa_event, None
+
+        if remainder is None:
+            alsa_event: _snd_seq_event_t = ffi.new("snd_seq_event_t *")
+            event._to_alsa(alsa_event, queue=queue, port=port, dest=dest)
+            midi_bytes = event.midi_bytes
+        else:
+            alsa_event, midi_bytes = remainder
+
+        parser = self._event_parser
+        if parser is None:
+            parser_p = ffi.new("snd_midi_event_t **")
+            err = alsa.snd_midi_event_new(1024, parser_p)
+            _check_alsa_error(err)
+            parser = ffi.gc(parser_p[0], alsa.snd_midi_event_free)
+            self._event_parser = parser
+
+        length = len(midi_bytes)
+        processed = alsa.snd_midi_event_encode(parser,
+                                               ffi.from_buffer(midi_bytes),
+                                               length,
+                                               alsa_event)
+
+        if processed < length:
+            return alsa_event, (alsa_event, midi_bytes[processed:])
+        else:
+            return alsa_event, None
+
     def _event_output(self,
                       event: Event,
                       queue: Union['Queue', int] = None,
                       port: Union['Port', int] = None,
-                      dest: AddressType = None) -> int:
-        alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
+                      dest: AddressType = None,
+                      remainder: Optional[Any] = None) -> Tuple[int, Any]:
+        alsa_event, remainder = self._prepare_event(event,
+                                                    queue=queue, port=port, dest=dest,
+                                                    remainder=remainder)
+        if alsa_event.type == EventType.NONE:
+            return alsa.snd_seq_event_output_pending(self.handle), remainder
         result = alsa.snd_seq_event_output(self.handle, alsa_event)
-        return result
+        return result, remainder
 
     def event_output(self,
                      event: Event,
@@ -266,8 +311,12 @@ class SequencerClientBase:
                      port: Union['Port', int] = None,
                      dest: AddressType = None) -> int:
         self._check_handle()
-        result = self._event_output(event, queue, port, dest)
-        _check_alsa_error(result)
+        remainder = None
+        while True:
+            result, remainder = self._event_output(event, queue, port, dest, remainder=remainder)
+            _check_alsa_error(result)
+            if remainder is None:
+                break
         return result
 
     def event_output_buffer(self,
@@ -276,19 +325,32 @@ class SequencerClientBase:
                             port: Union['Port', int] = None,
                             dest: AddressType = None) -> int:
         self._check_handle()
-        alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
-        result = alsa.snd_seq_event_output(self.handle, alsa_event)
-        _check_alsa_error(result)
+        remainder = None
+        while True:
+            alsa_event, remainder = self._prepare_event(event,
+                                                        queue=queue, port=port, dest=dest,
+                                                        remainder=remainder)
+            if alsa_event.type == EventType.NONE:
+                return alsa.snd_seq_event_output_pending(self.handle)
+            result = alsa.snd_seq_event_output(self.handle, alsa_event)
+            _check_alsa_error(result)
+            if remainder is None:
+                break
         return result
 
     def _event_output_direct(self,
                              event: Event,
                              queue: Union['Queue', int] = None,
                              port: Union['Port', int] = None,
-                             dest: AddressType = None) -> int:
-        alsa_event = event._to_alsa(queue=queue, port=port, dest=dest)
+                             dest: AddressType = None,
+                             remainder: Optional[Any] = None) -> Tuple[int, Any]:
+        alsa_event, remainder = self._prepare_event(event,
+                                                    queue=queue, port=port, dest=dest,
+                                                    remainder=remainder)
+        if alsa_event.type == EventType.NONE:
+            return alsa.snd_seq_event_output_pending(self.handle), remainder
         result = alsa.snd_seq_event_output(self.handle, alsa_event)
-        return result
+        return result, None
 
     def event_output_direct(self,
                             event: Event,
@@ -296,8 +358,13 @@ class SequencerClientBase:
                             port: Union['Port', int] = None,
                             dest: AddressType = None) -> int:
         self._check_handle()
-        result = self._event_output_direct(event, queue, port, dest)
-        _check_alsa_error(result)
+        remainder = None
+        while True:
+            result, remainder = self._event_output_direct(event, queue, port, dest,
+                                                          remainder=remainder)
+            _check_alsa_error(result)
+            if remainder is None:
+                break
         return result
 
     @overload
@@ -592,9 +659,11 @@ class SequencerClient(SequencerClientBase):
         else:
             until = None
 
+        remainder = None
+
         while True:
-            result = func()
-            if result != -errno.EAGAIN:
+            result, remainder = func(remainder=remainder)
+            if result != -errno.EAGAIN and remainder is None:
                 break
             if until is not None:
                 remaining = until - time.monotonic()
@@ -608,7 +677,11 @@ class SequencerClient(SequencerClientBase):
 
     def drain_output(self) -> int:
         self._check_handle()
-        func = partial(alsa.snd_seq_drain_output, self.handle)
+
+        def func(remainder=None):
+            _ = remainder
+            return alsa.snd_seq_drain_output(self.handle), None
+
         return self._event_output_wait(func)
 
     def event_output(self,
@@ -684,8 +757,8 @@ class AsyncSequencerClient(SequencerClientBase):
         ...
 
     async def _event_output_wait(self, func, timeout: Optional[float] = None) -> Union[int, None]:
-        result = func()
-        if result != -errno.EAGAIN:
+        result, remainder = func()
+        if result != -errno.EAGAIN and remainder is None:
             _check_alsa_error(result)
             return result
 
@@ -694,16 +767,17 @@ class AsyncSequencerClient(SequencerClientBase):
         fd = self._fd
 
         def writer_cb():
+            nonlocal remainder
             result = None
             try:
-                result = func()
+                result, remainder = func(remainder=remainder)
             except Exception as err:
                 fut.set_exception(err)
                 return
             finally:
-                if result != -errno.EAGAIN:
+                if result != -errno.EAGAIN and remainder is None:
                     loop.remove_reader(fd)
-            if result != -errno.EAGAIN:
+            if result != -errno.EAGAIN and remainder is None:
                 fut.set_result(result)
 
         loop.add_reader(fd, writer_cb)
@@ -720,7 +794,11 @@ class AsyncSequencerClient(SequencerClientBase):
 
     def drain_output(self) -> Awaitable[int]:
         self._check_handle()
-        func = partial(alsa.snd_seq_drain_output, self.handle)
+
+        def func(remainder=None):
+            _ = remainder
+            return alsa.snd_seq_drain_output(self.handle), None
+
         return self._event_output_wait(func)
 
     def event_output(self,

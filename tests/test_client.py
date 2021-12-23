@@ -6,6 +6,7 @@ import pytest
 from alsa_midi import (ALSAError, AsyncSequencerClient, ClientInfo, ClientType, SequencerClient,
                        StateError, alsa, ffi)
 from alsa_midi.client import SequencerClientBase
+from alsa_midi.event import EventType, MidiBytesEvent, NoteOffEvent, NoteOnEvent
 
 
 @pytest.mark.require_no_alsa_seq
@@ -72,6 +73,146 @@ def test_open_blocking():
     # allowed, but stupid
     client = SequencerClientBase("test", mode=0)
     client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_client_prepare_event():
+    client = SequencerClient("test")
+
+    event = NoteOnEvent(note=60, velocity=10)
+    alsa_event, remainder = client._prepare_event(event)
+    assert alsa_event.type == EventType.NOTEON
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 10
+    assert alsa_event.queue == alsa.SND_SEQ_QUEUE_DIRECT
+    assert alsa_event.source.port == 0
+    assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+    assert remainder is None
+
+    event = NoteOffEvent(note=60, velocity=20)
+    alsa_event, remainder = client._prepare_event(event, port=5, queue=6, dest=(1, 2))
+    assert alsa_event.type == EventType.NOTEOFF
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 20
+    assert alsa_event.queue == 6
+    assert alsa_event.source.port == 5
+    assert alsa_event.dest.client == 1
+    assert alsa_event.dest.port == 2
+    assert remainder is None
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_client_prepare_event_bytes():
+    client = SequencerClient("test")
+
+    # note on
+    event = MidiBytesEvent(midi_bytes=bytes([0x90, 0x3c, 0x0a]))
+    alsa_event, remainder = client._prepare_event(event)
+    assert alsa_event.type == EventType.NOTEON
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 10
+    assert alsa_event.queue == alsa.SND_SEQ_QUEUE_DIRECT
+    assert alsa_event.source.port == 0
+    assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+    assert remainder is None
+
+    # note off
+    event = MidiBytesEvent(midi_bytes=[0x80, 0x3c, 0x14])
+    alsa_event, remainder = client._prepare_event(event, port=5, queue=6, dest=(1, 2))
+    assert alsa_event.type == EventType.NOTEOFF
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 20
+    assert alsa_event.queue == 6
+    assert alsa_event.source.port == 5
+    assert alsa_event.dest.client == 1
+    assert alsa_event.dest.port == 2
+    assert remainder is None
+
+    # incomplete note on
+    event = MidiBytesEvent(midi_bytes=bytes([0x90]))
+    alsa_event, remainder = client._prepare_event(event)
+    assert alsa_event.type == EventType.NONE
+    assert remainder is None
+
+    # the rest of the note on
+    event = MidiBytesEvent(midi_bytes=bytes([0x3c, 0x0a]))
+    alsa_event, remainder = client._prepare_event(event)
+    assert alsa_event.type == EventType.NOTEON
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 10
+    assert alsa_event.queue == alsa.SND_SEQ_QUEUE_DIRECT
+    assert alsa_event.source.port == 0
+    assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+    assert remainder is None
+
+    # note on + note off
+    event = MidiBytesEvent(midi_bytes=bytes([0x90, 0x3c, 0x0a, 0x80, 0x3c, 0x14]))
+    alsa_event, remainder = client._prepare_event(event)
+    assert alsa_event.type == EventType.NOTEON
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 10
+    assert alsa_event.queue == alsa.SND_SEQ_QUEUE_DIRECT
+    assert alsa_event.source.port == 0
+    assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+    assert remainder is not None
+    alsa_event, remainder = client._prepare_event(event, remainder=remainder)
+    assert alsa_event.type == EventType.NOTEOFF
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 20
+    assert alsa_event.queue == alsa.SND_SEQ_QUEUE_DIRECT
+    assert alsa_event.source.port == 0
+    assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+    assert remainder is None
+
+    # note on + incomplete note off
+    event = MidiBytesEvent(midi_bytes=bytes([0x90, 0x3c, 0x0a, 0x80]))
+    alsa_event, remainder = client._prepare_event(event)
+    assert alsa_event.type == EventType.NOTEON
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 10
+    assert alsa_event.queue == alsa.SND_SEQ_QUEUE_DIRECT
+    assert alsa_event.source.port == 0
+    assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+    assert remainder is not None
+    alsa_event, remainder = client._prepare_event(event, remainder=remainder)
+    assert alsa_event.type == EventType.NONE
+
+    # remaining bytes of the note-off
+    event = MidiBytesEvent(midi_bytes=bytes([0x3c, 0x14]))
+    alsa_event, remainder = client._prepare_event(event, remainder=remainder)
+    assert alsa_event.type == EventType.NOTEOFF
+    assert alsa_event.data.note.note == 60
+    assert alsa_event.data.note.velocity == 20
+    assert alsa_event.queue == alsa.SND_SEQ_QUEUE_DIRECT
+    assert alsa_event.source.port == 0
+    assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
+    assert remainder is None
+
+    # short SysEx
+    event = MidiBytesEvent(midi_bytes=b"\xf0abcdefg\xf7")
+    alsa_event, remainder = client._prepare_event(event, remainder=remainder)
+    assert alsa_event.type == EventType.SYSEX
+    assert alsa_event.data.ext.len == 9
+    assert ffi.buffer(alsa_event.data.ext.ptr, alsa_event.data.ext.len) == b"\xf0abcdefg\xf7"
+    assert remainder is None
+
+    # long SysEx
+    event = MidiBytesEvent(midi_bytes=b"\xf0" + b"a" * 1200 + b"\xf7")
+    alsa_event, remainder = client._prepare_event(event, remainder=remainder)
+    assert alsa_event.type == EventType.SYSEX
+    len1 = alsa_event.data.ext.len
+    bytes1 = bytes(ffi.buffer(alsa_event.data.ext.ptr, alsa_event.data.ext.len))
+    assert len1 < 1202
+    assert bytes1[:3] == b"\xf0aa"
+    assert remainder is not None
+    alsa_event, remainder = client._prepare_event(event, remainder=remainder)
+    assert alsa_event.type == EventType.SYSEX
+    len2 = alsa_event.data.ext.len
+    bytes2 = bytes(ffi.buffer(alsa_event.data.ext.ptr, alsa_event.data.ext.len))
+    assert len1 + len2 == 1202
+    assert bytes1 + bytes2 == b"\xf0" + b"a" * 1200 + b"\xf7"
 
 
 def test_client_info():
