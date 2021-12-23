@@ -1,7 +1,16 @@
 
 import pytest
 
-from alsa_midi import Address, Event, EventFlags, EventType, RealTime, alsa, ffi
+from alsa_midi import (ActiveSensingEvent, Address, ChannelPressureEvent, ClockEvent,
+                       ContinueEvent, Control14BitChangeEvent, ControlChangeEvent, EchoEvent,
+                       Event, EventFlags, EventType, KeyPressEvent, KeySignatureEvent,
+                       MidiBytesEvent, NonRegisteredParameterChangeEvent, NoteEvent, NoteOffEvent,
+                       NoteOnEvent, OSSEvent, PitchBendEvent, ProgramChangeEvent, QueueSkewEvent,
+                       RealTime, RegisteredParameterChangeEvent, ResetEvent, ResultEvent,
+                       SetQueuePositionTickEvent, SetQueuePositionTimeEvent, SetQueueTempoEvent,
+                       SongPositionPointerEvent, SongSelectEvent, StartEvent, StopEvent,
+                       SyncPositionChangedEvent, SystemEvent, TickEvent, TimeSignatureEvent,
+                       TuneRequestEvent, alsa, ffi)
 
 
 def test_event():
@@ -16,6 +25,7 @@ def test_event():
     assert event.dest is None
     assert event.relative is None
     assert event.raw_data is None
+    assert repr(event) == "<Event unknown>"
 
     alsa_event = ffi.new("snd_seq_event_t *")
     result = event._to_alsa(alsa_event)
@@ -31,6 +41,8 @@ def test_event():
     assert alsa_event.source.port == 0
     assert alsa_event.dest.client == alsa.SND_SEQ_ADDRESS_SUBSCRIBERS
     assert alsa_event.dest.port == 0
+    assert bytes(ffi.buffer(alsa_event.data.raw8.d)) == b"\x00" * ffi.sizeof(alsa_event.data)
+    assert repr(event) == "<Event unknown>"
 
     alsa_event = ffi.new("snd_seq_event_t *")
     result = event._to_alsa(alsa_event,
@@ -49,6 +61,7 @@ def test_event():
     assert alsa_event.source.port == 12
     assert alsa_event.dest.client == 13
     assert alsa_event.dest.port == 14
+    assert repr(event) == "<Event unknown>"
 
     event = Event(type=EventType.NOTEON,
                   flags=EventFlags.PRIORITY_HIGH,
@@ -70,6 +83,7 @@ def test_event():
     assert event.dest == Address(7, 8)
     assert event.relative is True
     assert event.raw_data == b"abcde"
+    assert repr(event) == "<Event NOTEON>"
 
     alsa_event = ffi.new("snd_seq_event_t *")
     result = event._to_alsa(alsa_event)
@@ -124,6 +138,7 @@ def test_event_from_alsa():
     assert event.dest == Address(0, 0)
     assert event.relative is False
     assert event.raw_data == b"\x00" * ffi.sizeof(alsa_event.data)
+    assert repr(event) == "<Event SYSTEM>"
 
     alsa_event = ffi.new("snd_seq_event_t *")
     alsa_event.type = alsa.SND_SEQ_EVENT_NOTEOFF
@@ -149,3 +164,1548 @@ def test_event_from_alsa():
     assert event.dest == Address(11, 12)
     assert event.relative is True
     assert event.raw_data == b"x" * ffi.sizeof(alsa_event.data)
+    assert repr(event) == "<Event NOTEOFF>"
+
+
+def test_midi_bytest_event():
+    event = MidiBytesEvent(b"abcde", tag=5)
+    assert isinstance(event, Event)
+    assert event.tag == 5
+    assert event.midi_bytes == b"abcde"
+    assert repr(event) == "<MidiBytesEvent 61 62 63 64 65>"
+
+    event = MidiBytesEvent([0x00, 0x01], tag=6)
+    assert isinstance(event, Event)
+    assert event.tag == 6
+    assert event.midi_bytes == b"\x00\x01"
+    assert repr(event) == "<MidiBytesEvent 00 01>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == 0
+    assert alsa_event.tag == 6
+
+    # that is to be filled separately
+    assert bytes(ffi.buffer(alsa_event.data.raw8.d)) == b"\x00" * ffi.sizeof(alsa_event.data)
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_NOTEOFF
+    alsa_event.flags = alsa.SND_SEQ_TIME_STAMP_REAL | alsa.SND_SEQ_TIME_MODE_REL
+    alsa_event.tag = 5
+    alsa_event.queue = 6
+    alsa_event.time.time.tv_sec = 7
+    alsa_event.time.time.tv_nsec = 8
+    alsa_event.source.client = 9
+    alsa_event.source.port = 10
+    alsa_event.dest.client = 11
+    alsa_event.dest.port = 12
+    ffi.buffer(alsa_event.data.raw8.d)[:] = b"x" * ffi.sizeof(alsa_event.data)
+
+    event = MidiBytesEvent._from_alsa(alsa_event, midi_bytes=b"abcd")
+    assert isinstance(event, MidiBytesEvent)
+    assert event.type == EventType.NOTEOFF
+    assert event.flags == alsa.SND_SEQ_TIME_STAMP_REAL | alsa.SND_SEQ_TIME_MODE_REL
+    assert event.tag == 5
+    assert event.queue_id == 6
+    assert event.time == RealTime(7, 8)
+    assert event.tick is None
+    assert event.source == Address(9, 10)
+    assert event.dest == Address(11, 12)
+    assert event.relative is True
+    assert event.raw_data == b"x" * ffi.sizeof(alsa_event.data)
+    assert repr(event) == "<MidiBytesEvent 61 62 63 64>"
+
+
+def test_system_event():
+    event = SystemEvent(event=1, result=2, tag=3)
+    assert isinstance(event, SystemEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SYSTEM
+    assert event.event == 1
+    assert event.result == 2
+    assert event.tag == 3
+    assert repr(event) == "<SystemEvent event=1 result=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SYSTEM
+    assert alsa_event.data.result.event == 1
+    assert alsa_event.data.result.result == 2
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SYSTEM
+    alsa_event.tag = 5
+    alsa_event.data.result.event = 6
+    alsa_event.data.result.result = 7
+
+    event = SystemEvent._from_alsa(alsa_event)
+    assert isinstance(event, SystemEvent)
+    assert event.type == EventType.SYSTEM
+    assert event.tag == 5
+    assert event.event == 6
+    assert event.result == 7
+    assert repr(event) == "<SystemEvent event=6 result=7>"
+
+
+def test_result_event():
+    event = ResultEvent(event=1, result=2, tag=3)
+    assert isinstance(event, ResultEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.RESULT
+    assert event.event == 1
+    assert event.result == 2
+    assert event.tag == 3
+    assert repr(event) == "<ResultEvent event=1 result=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_RESULT
+    assert alsa_event.data.result.event == 1
+    assert alsa_event.data.result.result == 2
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_RESULT
+    alsa_event.tag = 5
+    alsa_event.data.result.event = 6
+    alsa_event.data.result.result = 7
+
+    event = ResultEvent._from_alsa(alsa_event)
+    assert isinstance(event, ResultEvent)
+    assert event.type == EventType.RESULT
+
+    assert event.tag == 5
+    assert event.event == 6
+    assert event.result == 7
+    assert repr(event) == "<ResultEvent event=6 result=7>"
+
+
+def test_note_event():
+    event = NoteEvent(note=61, tag=3)
+    assert isinstance(event, NoteEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTE
+    assert event.note == 61
+    assert event.channel == 0
+    assert event.velocity == 127
+    assert event.off_velocity == 0
+    assert event.duration == 0
+    assert repr(event) == "<NoteEvent channel=0 note=61 velocity=127 duration=0 off_velocity=0>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_NOTE
+    assert alsa_event.data.note.note == 61
+    assert alsa_event.data.note.channel == 0
+    assert alsa_event.data.note.velocity == 127
+    assert alsa_event.data.note.off_velocity == 0
+    assert alsa_event.data.note.duration == 0
+    assert alsa_event.tag == 3
+
+    event = NoteEvent(note=62, channel=5, velocity=6, duration=7, off_velocity=8, tag=9)
+    assert isinstance(event, NoteEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTE
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert event.duration == 7
+    assert event.off_velocity == 8
+    assert repr(event) == "<NoteEvent channel=5 note=62 velocity=6 duration=7 off_velocity=8>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_NOTE
+    assert alsa_event.data.note.note == 62
+    assert alsa_event.data.note.channel == 5
+    assert alsa_event.data.note.velocity == 6
+    assert alsa_event.data.note.duration == 7
+    assert alsa_event.data.note.off_velocity == 8
+    assert alsa_event.tag == 9
+
+    event = NoteEvent(62, 5, 6, 7, 8, tag=9)
+    assert isinstance(event, NoteEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTE
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert event.duration == 7
+    assert event.off_velocity == 8
+    assert repr(event) == "<NoteEvent channel=5 note=62 velocity=6 duration=7 off_velocity=8>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_NOTE
+    alsa_event.tag = 5
+    alsa_event.data.note.note = 63
+    alsa_event.data.note.channel = 5
+    alsa_event.data.note.velocity = 6
+    alsa_event.data.note.duration = 7
+    alsa_event.data.note.off_velocity = 8
+
+    event = NoteEvent._from_alsa(alsa_event)
+    assert isinstance(event, NoteEvent)
+    assert event.type == EventType.NOTE
+    assert event.tag == 5
+    assert event.note == 63
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert event.duration == 7
+    assert event.off_velocity == 8
+    assert repr(event) == "<NoteEvent channel=5 note=63 velocity=6 duration=7 off_velocity=8>"
+
+
+def test_note_on_event():
+    event = NoteOnEvent(note=61, tag=3)
+    assert isinstance(event, NoteOnEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTEON
+    assert event.note == 61
+    assert event.channel == 0
+    assert event.velocity == 127
+    assert repr(event) == "<NoteOnEvent channel=0 note=61 velocity=127>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_NOTEON
+    assert alsa_event.data.note.note == 61
+    assert alsa_event.data.note.channel == 0
+    assert alsa_event.data.note.velocity == 127
+    assert alsa_event.tag == 3
+
+    event = NoteOnEvent(note=62, channel=5, velocity=6, tag=9)
+    assert isinstance(event, NoteOnEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTEON
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<NoteOnEvent channel=5 note=62 velocity=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_NOTEON
+    assert alsa_event.data.note.note == 62
+    assert alsa_event.data.note.channel == 5
+    assert alsa_event.data.note.velocity == 6
+    assert alsa_event.tag == 9
+
+    event = NoteOnEvent(62, 5, 6, tag=9)
+    assert isinstance(event, NoteOnEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTEON
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<NoteOnEvent channel=5 note=62 velocity=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_NOTEON
+    alsa_event.tag = 5
+    alsa_event.data.note.note = 63
+    alsa_event.data.note.channel = 5
+    alsa_event.data.note.velocity = 6
+
+    event = NoteOnEvent._from_alsa(alsa_event)
+    assert isinstance(event, NoteOnEvent)
+    assert event.type == EventType.NOTEON
+    assert event.tag == 5
+    assert event.note == 63
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<NoteOnEvent channel=5 note=63 velocity=6>"
+
+
+def test_note_off_event():
+    event = NoteOffEvent(note=61, tag=3)
+    assert isinstance(event, NoteOffEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTEOFF
+    assert event.note == 61
+    assert event.channel == 0
+    assert event.velocity == 127
+    assert repr(event) == "<NoteOffEvent channel=0 note=61 velocity=127>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_NOTEOFF
+    assert alsa_event.data.note.note == 61
+    assert alsa_event.data.note.channel == 0
+    assert alsa_event.data.note.velocity == 127
+    assert alsa_event.tag == 3
+
+    event = NoteOffEvent(note=62, channel=5, velocity=6, tag=9)
+    assert isinstance(event, NoteOffEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTEOFF
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<NoteOffEvent channel=5 note=62 velocity=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_NOTEOFF
+    assert alsa_event.data.note.note == 62
+    assert alsa_event.data.note.channel == 5
+    assert alsa_event.data.note.velocity == 6
+    assert alsa_event.tag == 9
+
+    event = NoteOffEvent(62, 5, 6, tag=9)
+    assert isinstance(event, NoteOffEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NOTEOFF
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<NoteOffEvent channel=5 note=62 velocity=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_NOTEOFF
+    alsa_event.tag = 5
+    alsa_event.data.note.note = 63
+    alsa_event.data.note.channel = 5
+    alsa_event.data.note.velocity = 6
+
+    event = NoteOffEvent._from_alsa(alsa_event)
+    assert isinstance(event, NoteOffEvent)
+    assert event.type == EventType.NOTEOFF
+    assert event.tag == 5
+    assert event.note == 63
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<NoteOffEvent channel=5 note=63 velocity=6>"
+
+
+def test_key_press_event():
+    event = KeyPressEvent(note=61, tag=3)
+    assert isinstance(event, KeyPressEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.KEYPRESS
+    assert event.note == 61
+    assert event.channel == 0
+    assert event.velocity == 127
+    assert repr(event) == "<KeyPressEvent channel=0 note=61 velocity=127>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_KEYPRESS
+    assert alsa_event.data.note.note == 61
+    assert alsa_event.data.note.channel == 0
+    assert alsa_event.data.note.velocity == 127
+    assert alsa_event.tag == 3
+
+    event = KeyPressEvent(note=62, channel=5, velocity=6, tag=9)
+    assert isinstance(event, KeyPressEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.KEYPRESS
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<KeyPressEvent channel=5 note=62 velocity=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_KEYPRESS
+    assert alsa_event.data.note.note == 62
+    assert alsa_event.data.note.channel == 5
+    assert alsa_event.data.note.velocity == 6
+    assert alsa_event.tag == 9
+
+    event = KeyPressEvent(62, 5, 6, tag=9)
+    assert isinstance(event, KeyPressEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.KEYPRESS
+    assert event.note == 62
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<KeyPressEvent channel=5 note=62 velocity=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_KEYPRESS
+    alsa_event.tag = 5
+    alsa_event.data.note.note = 63
+    alsa_event.data.note.channel = 5
+    alsa_event.data.note.velocity = 6
+
+    event = KeyPressEvent._from_alsa(alsa_event)
+    assert isinstance(event, KeyPressEvent)
+    assert event.type == EventType.KEYPRESS
+    assert event.tag == 5
+    assert event.note == 63
+    assert event.channel == 5
+    assert event.velocity == 6
+    assert repr(event) == "<KeyPressEvent channel=5 note=63 velocity=6>"
+
+
+def test_control_change_event():
+    event = ControlChangeEvent(channel=1, param=2, value=3, tag=4)
+    assert isinstance(event, ControlChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CONTROLLER
+    assert event.channel == 1
+    assert event.param == 2
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<ControlChangeEvent channel=1 param=2 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CONTROLLER
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.param == 2
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = ControlChangeEvent(5, 6, 7, tag=8)
+    assert isinstance(event, ControlChangeEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.CONTROLLER
+    assert event.channel == 5
+    assert event.param == 6
+    assert event.value == 7
+    assert event.tag == 8
+    assert repr(event) == "<ControlChangeEvent channel=5 param=6 value=7>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CONTROLLER
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.param = 11
+    alsa_event.data.control.value = 12
+
+    event = ControlChangeEvent._from_alsa(alsa_event)
+    assert isinstance(event, ControlChangeEvent)
+    assert event.type == EventType.CONTROLLER
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.param == 11
+    assert event.value == 12
+    assert repr(event) == "<ControlChangeEvent channel=10 param=11 value=12>"
+
+
+def test_program_change_event():
+    event = ProgramChangeEvent(channel=1, value=3, tag=4)
+    assert isinstance(event, ProgramChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PGMCHANGE
+    assert event.channel == 1
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<ProgramChangeEvent channel=1 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PGMCHANGE
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = ProgramChangeEvent(5, 6, tag=8)
+    assert isinstance(event, ProgramChangeEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.PGMCHANGE
+    assert event.channel == 5
+    assert event.value == 6
+    assert event.tag == 8
+    assert repr(event) == "<ProgramChangeEvent channel=5 value=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_PGMCHANGE
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.value = 12
+
+    event = ProgramChangeEvent._from_alsa(alsa_event)
+    assert isinstance(event, ProgramChangeEvent)
+    assert event.type == EventType.PGMCHANGE
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.value == 12
+    assert repr(event) == "<ProgramChangeEvent channel=10 value=12>"
+
+
+def test_channel_pressure_event():
+    event = ChannelPressureEvent(channel=1, value=3, tag=4)
+    assert isinstance(event, ChannelPressureEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CHANPRESS
+    assert event.channel == 1
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<ChannelPressureEvent channel=1 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CHANPRESS
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = ChannelPressureEvent(5, 6, tag=8)
+    assert isinstance(event, ChannelPressureEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.CHANPRESS
+    assert event.channel == 5
+    assert event.value == 6
+    assert event.tag == 8
+    assert repr(event) == "<ChannelPressureEvent channel=5 value=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CHANPRESS
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.value = 12
+
+    event = ChannelPressureEvent._from_alsa(alsa_event)
+    assert isinstance(event, ChannelPressureEvent)
+    assert event.type == EventType.CHANPRESS
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.value == 12
+    assert repr(event) == "<ChannelPressureEvent channel=10 value=12>"
+
+
+def test_pitch_bend_event():
+    event = PitchBendEvent(channel=1, value=3, tag=4)
+    assert isinstance(event, PitchBendEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PITCHBEND
+    assert event.channel == 1
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<PitchBendEvent channel=1 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PITCHBEND
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = PitchBendEvent(5, 6, tag=8)
+    assert isinstance(event, PitchBendEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.PITCHBEND
+    assert event.channel == 5
+    assert event.value == 6
+    assert event.tag == 8
+    assert repr(event) == "<PitchBendEvent channel=5 value=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_PITCHBEND
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.value = 12
+
+    event = PitchBendEvent._from_alsa(alsa_event)
+    assert isinstance(event, PitchBendEvent)
+    assert event.type == EventType.PITCHBEND
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.value == 12
+    assert repr(event) == "<PitchBendEvent channel=10 value=12>"
+
+
+def test_control_14bit_change_event():
+    event = Control14BitChangeEvent(channel=1, param=2, value=3, tag=4)
+    assert isinstance(event, Control14BitChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CONTROL14
+    assert event.channel == 1
+    assert event.param == 2
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<Control14BitChangeEvent channel=1 param=2 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CONTROL14
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.param == 2
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = Control14BitChangeEvent(5, 6, 7, tag=8)
+    assert isinstance(event, Control14BitChangeEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.CONTROL14
+    assert event.channel == 5
+    assert event.param == 6
+    assert event.value == 7
+    assert event.tag == 8
+    assert repr(event) == "<Control14BitChangeEvent channel=5 param=6 value=7>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CONTROL14
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.param = 11
+    alsa_event.data.control.value = 12
+
+    event = Control14BitChangeEvent._from_alsa(alsa_event)
+    assert isinstance(event, Control14BitChangeEvent)
+    assert event.type == EventType.CONTROL14
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.param == 11
+    assert event.value == 12
+    assert repr(event) == "<Control14BitChangeEvent channel=10 param=11 value=12>"
+
+
+def test_non_registered_parameter_change_event():
+    event = NonRegisteredParameterChangeEvent(channel=1, param=2, value=3, tag=4)
+    assert isinstance(event, NonRegisteredParameterChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.NONREGPARAM
+    assert event.channel == 1
+    assert event.param == 2
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<NonRegisteredParameterChangeEvent channel=1 param=2 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_NONREGPARAM
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.param == 2
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = NonRegisteredParameterChangeEvent(5, 6, 7, tag=8)
+    assert isinstance(event, NonRegisteredParameterChangeEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.NONREGPARAM
+    assert event.channel == 5
+    assert event.param == 6
+    assert event.value == 7
+    assert event.tag == 8
+    assert repr(event) == "<NonRegisteredParameterChangeEvent channel=5 param=6 value=7>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_NONREGPARAM
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.param = 11
+    alsa_event.data.control.value = 12
+
+    event = NonRegisteredParameterChangeEvent._from_alsa(alsa_event)
+    assert isinstance(event, NonRegisteredParameterChangeEvent)
+    assert event.type == EventType.NONREGPARAM
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.param == 11
+    assert event.value == 12
+    assert repr(event) == "<NonRegisteredParameterChangeEvent channel=10 param=11 value=12>"
+
+
+def test_registered_parameter_change_event():
+    event = RegisteredParameterChangeEvent(channel=1, param=2, value=3, tag=4)
+    assert isinstance(event, RegisteredParameterChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.REGPARAM
+    assert event.channel == 1
+    assert event.param == 2
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<RegisteredParameterChangeEvent channel=1 param=2 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_REGPARAM
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.param == 2
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = RegisteredParameterChangeEvent(5, 6, 7, tag=8)
+    assert isinstance(event, RegisteredParameterChangeEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.REGPARAM
+    assert event.channel == 5
+    assert event.param == 6
+    assert event.value == 7
+    assert event.tag == 8
+    assert repr(event) == "<RegisteredParameterChangeEvent channel=5 param=6 value=7>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_REGPARAM
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.param = 11
+    alsa_event.data.control.value = 12
+
+    event = RegisteredParameterChangeEvent._from_alsa(alsa_event)
+    assert isinstance(event, RegisteredParameterChangeEvent)
+    assert event.type == EventType.REGPARAM
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.param == 11
+    assert event.value == 12
+    assert repr(event) == "<RegisteredParameterChangeEvent channel=10 param=11 value=12>"
+
+
+def test_song_position_pointer_event():
+    event = SongPositionPointerEvent(channel=1, value=3, tag=4)
+    assert isinstance(event, SongPositionPointerEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SONGPOS
+    assert event.channel == 1
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<SongPositionPointerEvent channel=1 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SONGPOS
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = SongPositionPointerEvent(5, 6, tag=8)
+    assert isinstance(event, SongPositionPointerEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.SONGPOS
+    assert event.channel == 5
+    assert event.value == 6
+    assert event.tag == 8
+    assert repr(event) == "<SongPositionPointerEvent channel=5 value=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SONGPOS
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.value = 12
+
+    event = SongPositionPointerEvent._from_alsa(alsa_event)
+    assert isinstance(event, SongPositionPointerEvent)
+    assert event.type == EventType.SONGPOS
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.value == 12
+    assert repr(event) == "<SongPositionPointerEvent channel=10 value=12>"
+
+
+def test_song_select_event():
+    event = SongSelectEvent(channel=1, value=3, tag=4)
+    assert isinstance(event, SongSelectEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SONGSEL
+    assert event.channel == 1
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<SongSelectEvent channel=1 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SONGSEL
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = SongSelectEvent(5, 6, tag=8)
+    assert isinstance(event, SongSelectEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.SONGSEL
+    assert event.channel == 5
+    assert event.value == 6
+    assert event.tag == 8
+    assert repr(event) == "<SongSelectEvent channel=5 value=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SONGSEL
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.value = 12
+
+    event = SongSelectEvent._from_alsa(alsa_event)
+    assert isinstance(event, SongSelectEvent)
+    assert event.type == EventType.SONGSEL
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.value == 12
+    assert repr(event) == "<SongSelectEvent channel=10 value=12>"
+
+
+def test_time_signature_event():
+    event = TimeSignatureEvent(channel=1, value=3, tag=4)
+    assert isinstance(event, TimeSignatureEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.TIMESIGN
+    assert event.channel == 1
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<TimeSignatureEvent channel=1 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_TIMESIGN
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = TimeSignatureEvent(5, 6, tag=8)
+    assert isinstance(event, TimeSignatureEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.TIMESIGN
+    assert event.channel == 5
+    assert event.value == 6
+    assert event.tag == 8
+    assert repr(event) == "<TimeSignatureEvent channel=5 value=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_TIMESIGN
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.value = 12
+
+    event = TimeSignatureEvent._from_alsa(alsa_event)
+    assert isinstance(event, TimeSignatureEvent)
+    assert event.type == EventType.TIMESIGN
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.value == 12
+    assert repr(event) == "<TimeSignatureEvent channel=10 value=12>"
+
+
+def test_key_signature_event():
+    event = KeySignatureEvent(channel=1, value=3, tag=4)
+    assert isinstance(event, KeySignatureEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.KEYSIGN
+    assert event.channel == 1
+    assert event.value == 3
+    assert event.tag == 4
+    assert repr(event) == "<KeySignatureEvent channel=1 value=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_KEYSIGN
+    assert alsa_event.data.control.channel == 1
+    assert alsa_event.data.control.value == 3
+    assert alsa_event.tag == 4
+
+    event = KeySignatureEvent(5, 6, tag=8)
+    assert isinstance(event, KeySignatureEvent)
+    assert isinstance(event, Event)
+
+    assert event.type == EventType.KEYSIGN
+    assert event.channel == 5
+    assert event.value == 6
+    assert event.tag == 8
+    assert repr(event) == "<KeySignatureEvent channel=5 value=6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_KEYSIGN
+    alsa_event.tag = 9
+    alsa_event.data.control.channel = 10
+    alsa_event.data.control.value = 12
+
+    event = KeySignatureEvent._from_alsa(alsa_event)
+    assert isinstance(event, KeySignatureEvent)
+    assert event.type == EventType.KEYSIGN
+    assert event.tag == 9
+    assert event.channel == 10
+    assert event.value == 12
+    assert repr(event) == "<KeySignatureEvent channel=10 value=12>"
+
+
+def test_start_event():
+    event = StartEvent()
+    assert isinstance(event, StartEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.START
+    assert event.control_queue is None
+    assert repr(event) == "<StartEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_START
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.tag == 0
+
+    event = StartEvent(control_queue=2, tag=3)
+    assert isinstance(event, StartEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.START
+    assert event.control_queue == 2
+    assert event.tag == 3
+    assert repr(event) == "<StartEvent queue=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_START
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_START
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+
+    event = StartEvent._from_alsa(alsa_event)
+    assert isinstance(event, StartEvent)
+    assert event.type == EventType.START
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert repr(event) == "<StartEvent queue=10>"
+
+
+def test_continue_event():
+    event = ContinueEvent()
+    assert isinstance(event, ContinueEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CONTINUE
+    assert event.control_queue is None
+    assert repr(event) == "<ContinueEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CONTINUE
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.tag == 0
+
+    event = ContinueEvent(control_queue=2, tag=3)
+    assert isinstance(event, ContinueEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CONTINUE
+    assert event.control_queue == 2
+    assert event.tag == 3
+    assert repr(event) == "<ContinueEvent queue=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CONTINUE
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CONTINUE
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+
+    event = ContinueEvent._from_alsa(alsa_event)
+    assert isinstance(event, ContinueEvent)
+    assert event.type == EventType.CONTINUE
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert repr(event) == "<ContinueEvent queue=10>"
+
+
+def test_stop_event():
+    event = StopEvent()
+    assert isinstance(event, StopEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.STOP
+    assert event.control_queue is None
+    assert repr(event) == "<StopEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_STOP
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.tag == 0
+
+    event = StopEvent(control_queue=2, tag=3)
+    assert isinstance(event, StopEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.STOP
+    assert event.control_queue == 2
+    assert event.tag == 3
+    assert repr(event) == "<StopEvent queue=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_STOP
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_STOP
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+
+    event = StopEvent._from_alsa(alsa_event)
+    assert isinstance(event, StopEvent)
+    assert event.type == EventType.STOP
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert repr(event) == "<StopEvent queue=10>"
+
+
+def test_set_queue_position_tick_event():
+    event = SetQueuePositionTickEvent(position=10)
+    assert isinstance(event, SetQueuePositionTickEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SETPOS_TICK
+    assert event.control_queue is None
+    assert event.position == 10
+    assert repr(event) == "<SetQueuePositionTickEvent position=10>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SETPOS_TICK
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.data.queue.param.time.tick == 10
+    assert alsa_event.tag == 0
+
+    event = SetQueuePositionTickEvent(control_queue=2, position=3, tag=4)
+    assert isinstance(event, SetQueuePositionTickEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SETPOS_TICK
+    assert event.control_queue == 2
+    assert event.position == 3
+    assert event.tag == 4
+    assert repr(event) == "<SetQueuePositionTickEvent queue=2 position=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SETPOS_TICK
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.data.queue.param.time.tick == 3
+    assert alsa_event.tag == 4
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SETPOS_TICK
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+    alsa_event.data.queue.param.time.tick = 11
+
+    event = SetQueuePositionTickEvent._from_alsa(alsa_event)
+    assert isinstance(event, SetQueuePositionTickEvent)
+    assert event.type == EventType.SETPOS_TICK
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert event.position == 11
+    assert repr(event) == "<SetQueuePositionTickEvent queue=10 position=11>"
+
+
+def test_set_queue_position_time_event():
+    event = SetQueuePositionTimeEvent(position=10.0)
+    assert isinstance(event, SetQueuePositionTimeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SETPOS_TIME
+    assert event.control_queue is None
+    assert event.position == RealTime(10, 0)
+    assert repr(event) == "<SetQueuePositionTimeEvent position=10.000000000>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SETPOS_TIME
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.data.queue.param.time.time.tv_sec == 10
+    assert alsa_event.data.queue.param.time.time.tv_nsec == 0
+    assert alsa_event.tag == 0
+
+    event = SetQueuePositionTimeEvent(control_queue=2, position=RealTime(3, 3), tag=4)
+    assert isinstance(event, SetQueuePositionTimeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SETPOS_TIME
+    assert event.control_queue == 2
+    assert event.position == RealTime(3, 3)
+    assert event.tag == 4
+    assert repr(event) == "<SetQueuePositionTimeEvent queue=2 position=3.000000003>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SETPOS_TIME
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.data.queue.param.time.time.tv_sec == 3
+    assert alsa_event.data.queue.param.time.time.tv_nsec == 3
+    assert alsa_event.tag == 4
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SETPOS_TIME
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+    alsa_event.data.queue.param.time.time.tv_sec = 11
+    alsa_event.data.queue.param.time.time.tv_nsec = 12
+
+    event = SetQueuePositionTimeEvent._from_alsa(alsa_event)
+    assert isinstance(event, SetQueuePositionTimeEvent)
+    assert event.type == EventType.SETPOS_TIME
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert event.position == RealTime(11, 12)
+    assert repr(event) == "<SetQueuePositionTimeEvent queue=10 position=11.000000012>"
+
+
+def test_set_queue_tempo_event():
+    with pytest.raises(ValueError):
+        SetQueueTempoEvent()
+
+    event = SetQueueTempoEvent(midi_tempo=500000)
+    assert isinstance(event, SetQueueTempoEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.TEMPO
+    assert event.control_queue is None
+    assert event.midi_tempo == 500000
+    assert event.bpm == pytest.approx(120.0)
+    assert repr(event) == "<SetQueueTempoEvent tempo=500000 (120.0 bpm)>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_TEMPO
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.data.queue.param.value == 500000
+    assert alsa_event.tag == 0
+
+    event = SetQueueTempoEvent(control_queue=2, bpm=90, tag=4)
+    assert isinstance(event, SetQueueTempoEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.TEMPO
+    assert event.control_queue == 2
+    assert event.midi_tempo == 666667
+    assert event.bpm == pytest.approx(90.0)
+    assert event.tag == 4
+    assert repr(event) == "<SetQueueTempoEvent queue=2 tempo=666667 (90.0 bpm)>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_TEMPO
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.data.queue.param.value == 666667
+    assert alsa_event.tag == 4
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_TEMPO
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+    alsa_event.data.queue.param.value = 1000000
+
+    event = SetQueueTempoEvent._from_alsa(alsa_event)
+    assert isinstance(event, SetQueueTempoEvent)
+    assert event.type == EventType.TEMPO
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert event.midi_tempo == 1000000
+    assert event.bpm == pytest.approx(60.0)
+    assert repr(event) == "<SetQueueTempoEvent queue=10 tempo=1000000 (60.0 bpm)>"
+
+
+def test_clock_event():
+    event = ClockEvent()
+    assert isinstance(event, ClockEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLOCK
+    assert event.control_queue is None
+    assert repr(event) == "<ClockEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLOCK
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.tag == 0
+
+    event = ClockEvent(control_queue=2, tag=3)
+    assert isinstance(event, ClockEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLOCK
+    assert event.control_queue == 2
+    assert event.tag == 3
+    assert repr(event) == "<ClockEvent queue=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLOCK
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CLOCK
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+
+    event = ClockEvent._from_alsa(alsa_event)
+    assert isinstance(event, ClockEvent)
+    assert event.type == EventType.CLOCK
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert repr(event) == "<ClockEvent queue=10>"
+
+
+def test_tick_event():
+    event = TickEvent()
+    assert isinstance(event, TickEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.TICK
+    assert event.control_queue is None
+    assert repr(event) == "<TickEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_TICK
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.tag == 0
+
+    event = TickEvent(control_queue=2, tag=3)
+    assert isinstance(event, TickEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.TICK
+    assert event.control_queue == 2
+    assert event.tag == 3
+    assert repr(event) == "<TickEvent queue=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_TICK
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_TICK
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+
+    event = TickEvent._from_alsa(alsa_event)
+    assert isinstance(event, TickEvent)
+    assert event.type == EventType.TICK
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert repr(event) == "<TickEvent queue=10>"
+
+
+def test_set_queue_skew_event():
+    event = QueueSkewEvent(value=1, base=2)
+    assert isinstance(event, QueueSkewEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.QUEUE_SKEW
+    assert event.control_queue is None
+    assert event.value == 1
+    assert event.base == 2
+    assert repr(event) == "<QueueSkewEvent value=1 base=2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_QUEUE_SKEW
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.data.queue.param.skew.value == 1
+    assert alsa_event.data.queue.param.skew.base == 2
+    assert alsa_event.tag == 0
+
+    event = QueueSkewEvent(2, 3, control_queue=4, tag=5)
+    assert isinstance(event, QueueSkewEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.QUEUE_SKEW
+    assert event.control_queue == 4
+    assert event.value == 2
+    assert event.base == 3
+    assert event.tag == 5
+    assert repr(event) == "<QueueSkewEvent queue=4 value=2 base=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_QUEUE_SKEW
+    assert alsa_event.data.queue.queue == 4
+    assert alsa_event.data.queue.param.skew.value == 2
+    assert alsa_event.data.queue.param.skew.base == 3
+    assert alsa_event.tag == 5
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_QUEUE_SKEW
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+    alsa_event.data.queue.param.skew.value = 11
+    alsa_event.data.queue.param.skew.base = 12
+
+    event = QueueSkewEvent._from_alsa(alsa_event)
+    assert isinstance(event, QueueSkewEvent)
+    assert event.type == EventType.QUEUE_SKEW
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert event.value == 11
+    assert event.base == 12
+    assert repr(event) == "<QueueSkewEvent queue=10 value=11 base=12>"
+
+
+def test_sync_position_changed_event():
+    event = SyncPositionChangedEvent(position=10)
+    assert isinstance(event, SyncPositionChangedEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SYNC_POS
+    assert event.control_queue is None
+    assert event.position == 10
+    assert repr(event) == "<SyncPositionChangedEvent position=10>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SYNC_POS
+    assert alsa_event.data.queue.queue == 0
+    assert alsa_event.data.queue.param.position == 10
+    assert alsa_event.tag == 0
+
+    event = SyncPositionChangedEvent(control_queue=2, position=3, tag=4)
+    assert isinstance(event, SyncPositionChangedEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SYNC_POS
+    assert event.control_queue == 2
+    assert event.position == 3
+    assert event.tag == 4
+    assert repr(event) == "<SyncPositionChangedEvent queue=2 position=3>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SYNC_POS
+    assert alsa_event.data.queue.queue == 2
+    assert alsa_event.data.queue.param.position == 3
+    assert alsa_event.tag == 4
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SYNC_POS
+    alsa_event.tag = 9
+    alsa_event.data.queue.queue = 10
+    alsa_event.data.queue.param.position = 11
+
+    event = SyncPositionChangedEvent._from_alsa(alsa_event)
+    assert isinstance(event, SyncPositionChangedEvent)
+    assert event.type == EventType.SYNC_POS
+    assert event.tag == 9
+    assert event.control_queue == 10
+    assert event.position == 11
+    assert repr(event) == "<SyncPositionChangedEvent queue=10 position=11>"
+
+
+def test_tune_request_event():
+    event = TuneRequestEvent()
+    assert isinstance(event, TuneRequestEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.TUNE_REQUEST
+    assert repr(event) == "<TuneRequestEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_TUNE_REQUEST
+    assert alsa_event.tag == 0
+
+    event = TuneRequestEvent(tag=3)
+    assert isinstance(event, TuneRequestEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.TUNE_REQUEST
+    assert event.tag == 3
+    assert repr(event) == "<TuneRequestEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_TUNE_REQUEST
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_TUNE_REQUEST
+    alsa_event.tag = 9
+
+    event = TuneRequestEvent._from_alsa(alsa_event)
+    assert isinstance(event, TuneRequestEvent)
+    assert event.type == EventType.TUNE_REQUEST
+    assert event.tag == 9
+    assert repr(event) == "<TuneRequestEvent>"
+
+
+def test_reset_event():
+    event = ResetEvent()
+    assert isinstance(event, ResetEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.RESET
+    assert repr(event) == "<ResetEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_RESET
+    assert alsa_event.tag == 0
+
+    event = ResetEvent(tag=3)
+    assert isinstance(event, ResetEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.RESET
+    assert event.tag == 3
+    assert repr(event) == "<ResetEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_RESET
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_RESET
+    alsa_event.tag = 9
+
+    event = ResetEvent._from_alsa(alsa_event)
+    assert isinstance(event, ResetEvent)
+    assert event.type == EventType.RESET
+    assert event.tag == 9
+    assert repr(event) == "<ResetEvent>"
+
+
+def test_active_sensing_event():
+    event = ActiveSensingEvent()
+    assert isinstance(event, ActiveSensingEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SENSING
+    assert repr(event) == "<ActiveSensingEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SENSING
+    assert alsa_event.tag == 0
+
+    event = ActiveSensingEvent(tag=3)
+    assert isinstance(event, ActiveSensingEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SENSING
+    assert event.tag == 3
+    assert repr(event) == "<ActiveSensingEvent>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SENSING
+    assert alsa_event.tag == 3
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SENSING
+    alsa_event.tag = 9
+
+    event = ActiveSensingEvent._from_alsa(alsa_event)
+    assert isinstance(event, ActiveSensingEvent)
+    assert event.type == EventType.SENSING
+    assert event.tag == 9
+    assert repr(event) == "<ActiveSensingEvent>"
+
+
+def test_echo_event():
+    event = EchoEvent()
+    assert isinstance(event, EchoEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.ECHO
+    assert repr(event) == "<EchoEvent data=None>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_ECHO
+    assert alsa_event.tag == 0
+    empty = b"\x00" * ffi.sizeof("snd_seq_ev_raw8_t")
+    assert bytes(ffi.buffer(alsa_event.data.raw8.d)) == empty
+
+    event = EchoEvent(tag=3, raw_data=b"abcd")
+    assert isinstance(event, EchoEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.ECHO
+    assert event.tag == 3
+    assert repr(event).startswith("<EchoEvent data=b'abcd")
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_ECHO
+    assert alsa_event.tag == 3
+    assert ffi.buffer(alsa_event.data.raw8.d)[:4] == b"abcd"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_ECHO
+    alsa_event.tag = 9
+    ffi.buffer(alsa_event.data.raw8.d)[:5] = b"12345"
+
+    event = EchoEvent._from_alsa(alsa_event)
+    assert isinstance(event, EchoEvent)
+    assert event.type == EventType.ECHO
+    assert event.tag == 9
+    assert repr(event).startswith("<EchoEvent data=b'12345")
+
+
+def test_oss_event():
+    event = OSSEvent()
+    assert isinstance(event, OSSEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.OSS
+    assert repr(event) == "<OSSEvent data=None>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_OSS
+    assert alsa_event.tag == 0
+    empty = b"\x00" * ffi.sizeof("snd_seq_ev_raw8_t")
+    assert bytes(ffi.buffer(alsa_event.data.raw8.d)) == empty
+
+    event = OSSEvent(tag=3, raw_data=b"abcd")
+    assert isinstance(event, OSSEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.OSS
+    assert event.tag == 3
+    assert repr(event).startswith("<OSSEvent data=b'abcd")
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_OSS
+    assert alsa_event.tag == 3
+    assert ffi.buffer(alsa_event.data.raw8.d)[:4] == b"abcd"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_OSS
+    alsa_event.tag = 9
+    ffi.buffer(alsa_event.data.raw8.d)[:5] = b"12345"
+
+    event = OSSEvent._from_alsa(alsa_event)
+    assert isinstance(event, OSSEvent)
+    assert event.type == EventType.OSS
+    assert event.tag == 9
+    assert repr(event).startswith("<OSSEvent data=b'12345")
