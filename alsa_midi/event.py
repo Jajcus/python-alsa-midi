@@ -300,13 +300,13 @@ class Event:
         if self.time is not None:
             event.time.time.tv_sec = self.time.seconds
             event.time.time.tv_nsec = self.time.nanoseconds
-            flags &= ~(EventFlags.TIME_STAMP_MASK | EventFlags.TIME_STAMP_REAL)
+            flags = flags & ~EventFlags.TIME_STAMP_MASK | EventFlags.TIME_STAMP_REAL
         if self.tick is not None:
             event.time.tick = self.tick
-            flags &= ~(EventFlags.TIME_STAMP_MASK | EventFlags.TIME_STAMP_TICK)
+            flags = flags & ~EventFlags.TIME_STAMP_MASK | EventFlags.TIME_STAMP_TICK
         if self.relative is not None:
             rel = EventFlags.TIME_MODE_REL if self.relative else EventFlags.TIME_MODE_ABS
-            flags &= ~(EventFlags.TIME_MODE_MASK | rel)
+            flags = flags & ~EventFlags.TIME_MODE_MASK | rel
         if port is not None:
             if isinstance(port, int):
                 event.source.port = port
