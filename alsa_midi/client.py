@@ -13,7 +13,7 @@ from .event import Event
 from .exceptions import StateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
                    WRITE_PORT_PREFERRED_TYPES, Port, PortCaps, PortInfo, PortType,
-                   _snd_seq_port_info_t_p, get_port_info_sort_key)
+                   get_port_info_sort_key)
 from .queue import Queue
 from .util import _check_alsa_error
 
@@ -38,7 +38,6 @@ class ClientType(IntEnum):
 
 
 _snd_seq_client_info_t = NewType("_snd_seq_client_info_t", object)
-_snd_seq_client_info_t_p = NewType("_snd_seq_client_info_t", Tuple[_snd_seq_client_info_t])
 
 
 class ClientInfo:
@@ -92,10 +91,10 @@ class ClientInfo:
                 )
 
     def _to_alsa(self) -> _snd_seq_client_info_t:
-        info_p: _snd_seq_client_info_t_p = ffi.new("snd_seq_client_info_t **")
+        info_p = ffi.new("snd_seq_client_info_t **")
         err = alsa.snd_seq_client_info_malloc(info_p)
         _check_alsa_error(err)
-        info = info_p[0]
+        info = ffi.gc(info_p[0], alsa.snd_seq_client_info_free)
         alsa.snd_seq_client_info_set_client(info, self.client_id)
         alsa.snd_seq_client_info_set_name(info, self.name.encode())
         alsa.snd_seq_client_info_set_broadcast_filter(info, 1 if self.broadcast_filter else 0)
@@ -179,10 +178,10 @@ class SequencerClientBase:
                                                    name.encode(),
                                                    caps, type)
         else:
-            info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+            info_p = ffi.new("snd_seq_port_info_t **")
             err = alsa.snd_seq_port_info_malloc(info_p)
             _check_alsa_error(err)
-            info = info_p[0]
+            info = ffi.gc(info_p[0], alsa.snd_seq_port_info_free)
             alsa.snd_seq_port_info_set_name(info, name.encode())
             alsa.snd_seq_port_info_set_capability(info, caps)
             alsa.snd_seq_port_info_set_type(info, type)
@@ -315,19 +314,16 @@ class SequencerClientBase:
         if isinstance(previous, ClientInfo):
             info = previous._to_alsa()
         else:
-            info_p: _snd_seq_client_info_t_p = ffi.new("snd_seq_client_info_t **")
+            info_p = ffi.new("snd_seq_client_info_t **")
             err = alsa.snd_seq_client_info_malloc(info_p)
             _check_alsa_error(err)
-            info = info_p[0]
+            info = ffi.gc(info_p[0], alsa.snd_seq_client_info_free)
             alsa.snd_seq_client_info_set_client(info, -1 if previous is None else previous)
-        try:
-            err = alsa.snd_seq_query_next_client(self.handle, info)
-            if err == -errno.ENOENT:
-                return None
-            _check_alsa_error(err)
-            result = ClientInfo._from_alsa(info)
-        finally:
-            alsa.snd_seq_client_info_free(info)
+        err = alsa.snd_seq_query_next_client(self.handle, info)
+        if err == -errno.ENOENT:
+            return None
+        _check_alsa_error(err)
+        result = ClientInfo._from_alsa(info)
         return result
 
     def get_port_info(self, port: Union[int, AddressType]) -> PortInfo:
@@ -336,19 +332,16 @@ class SequencerClientBase:
             port_id = port
         else:
             client_id, port_id = Address(port)
-        info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+        info_p = ffi.new("snd_seq_port_info_t **")
         err = alsa.snd_seq_port_info_malloc(info_p)
         _check_alsa_error(err)
-        info = info_p[0]
-        try:
-            if client_id == self.client_id:
-                err = alsa.snd_seq_get_port_info(self.handle, port_id, info)
-            else:
-                err = alsa.snd_seq_get_any_port_info(self.handle, client_id, port_id, info)
-            _check_alsa_error(err)
-            result = PortInfo._from_alsa(info)
-        finally:
-            alsa.snd_seq_port_info_free(info)
+        info = ffi.gc(info_p[0], alsa.snd_seq_port_info_free)
+        if client_id == self.client_id:
+            err = alsa.snd_seq_get_port_info(self.handle, port_id, info)
+        else:
+            err = alsa.snd_seq_get_any_port_info(self.handle, client_id, port_id, info)
+        _check_alsa_error(err)
+        result = PortInfo._from_alsa(info)
         return result
 
     def set_port_info(self, port: Union[int, Port], info: PortInfo):
@@ -380,20 +373,17 @@ class SequencerClientBase:
                 raise ValueError("client_id mismatch")
             info = previous._to_alsa()
         else:
-            info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+            info_p = ffi.new("snd_seq_port_info_t **")
             err = alsa.snd_seq_port_info_malloc(info_p)
             _check_alsa_error(err)
-            info = info_p[0]
+            info = ffi.gc(info_p[0], alsa.snd_seq_port_info_free)
             alsa.snd_seq_port_info_set_client(info, client_id)
             alsa.snd_seq_port_info_set_port(info, -1 if previous is None else previous)
-        try:
-            err = alsa.snd_seq_query_next_port(self.handle, info)
-            if err == -errno.ENOENT:
-                return None
-            _check_alsa_error(err)
-            result = PortInfo._from_alsa(info)
-        finally:
-            alsa.snd_seq_port_info_free(info)
+        err = alsa.snd_seq_query_next_port(self.handle, info)
+        if err == -errno.ENOENT:
+            return None
+        _check_alsa_error(err)
+        result = PortInfo._from_alsa(info)
         return result
 
     def list_ports(self, *,
@@ -410,88 +400,79 @@ class SequencerClientBase:
         result = []
         self._check_handle()
 
-        client_ainfo = None
-        port_ainfo = None
+        client_ainfo_p = ffi.new("snd_seq_client_info_t **")
+        err = alsa.snd_seq_client_info_malloc(client_ainfo_p)
+        _check_alsa_error(err)
+        client_ainfo = ffi.gc(client_ainfo_p[0], alsa.snd_seq_client_info_free)
+        port_ainfo_p = ffi.new("snd_seq_port_info_t **")
+        err = alsa.snd_seq_port_info_malloc(port_ainfo_p)
+        _check_alsa_error(err)
+        port_ainfo = ffi.gc(port_ainfo_p[0], alsa.snd_seq_port_info_free)
 
-        try:
-            client_ainfo_p: _snd_seq_client_info_t_p = ffi.new("snd_seq_client_info_t **")
-            err = alsa.snd_seq_client_info_malloc(client_ainfo_p)
+        alsa.snd_seq_client_info_set_client(client_ainfo, -1)
+        while True:
+            err = alsa.snd_seq_query_next_client(self.handle, client_ainfo)
+            if err == -errno.ENOENT:
+                break
             _check_alsa_error(err)
-            client_ainfo = client_ainfo_p[0]
-            port_ainfo_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
-            err = alsa.snd_seq_port_info_malloc(port_ainfo_p)
-            _check_alsa_error(err)
-            port_ainfo = port_ainfo_p[0]
 
-            alsa.snd_seq_client_info_set_client(client_ainfo, -1)
+            client_id = alsa.snd_seq_client_info_get_client(client_ainfo)
+            if client_id == 0 and not include_system:
+                continue
+
+            client_name = alsa.snd_seq_client_info_get_name(client_ainfo)
+            client_name = ffi.string(client_name).decode()
+
+            if client_name == "Midi Through" and not include_midi_through:
+                continue
+
+            alsa.snd_seq_port_info_set_client(port_ainfo, client_id)
+            alsa.snd_seq_port_info_set_port(port_ainfo, -1)
             while True:
-                err = alsa.snd_seq_query_next_client(self.handle, client_ainfo)
+                err = alsa.snd_seq_query_next_port(self.handle, port_ainfo)
                 if err == -errno.ENOENT:
                     break
                 _check_alsa_error(err)
 
-                client_id = alsa.snd_seq_client_info_get_client(client_ainfo)
-                if client_id == 0 and not include_system:
+                port_info = PortInfo._from_alsa(port_ainfo)
+
+                if type and (port_info.type & type) != type:
                     continue
 
-                client_name = alsa.snd_seq_client_info_get_name(client_ainfo)
-                client_name = ffi.string(client_name).decode()
-
-                if client_name == "Midi Through" and not include_midi_through:
+                if port_info.capability & PortCaps.NO_EXPORT \
+                        and not include_no_export:
                     continue
 
-                alsa.snd_seq_port_info_set_client(port_ainfo, client_id)
-                alsa.snd_seq_port_info_set_port(port_ainfo, -1)
-                while True:
-                    err = alsa.snd_seq_query_next_port(self.handle, port_ainfo)
-                    if err == -errno.ENOENT:
-                        break
-                    _check_alsa_error(err)
+                can_write = port_info.capability & PortCaps.WRITE
+                can_sub_write = port_info.capability & PortCaps.SUBS_WRITE
+                can_read = port_info.capability & PortCaps.READ
+                can_sub_read = port_info.capability & PortCaps.SUBS_READ
 
-                    port_info = PortInfo._from_alsa(port_ainfo)
-
-                    if type and (port_info.type & type) != type:
+                if output:
+                    if not can_write:
+                        continue
+                    if only_connectable and not can_sub_write:
                         continue
 
-                    if port_info.capability & PortCaps.NO_EXPORT \
-                            and not include_no_export:
+                if input:
+                    if not can_read:
+                        continue
+                    if only_connectable and not can_sub_read:
                         continue
 
-                    can_write = port_info.capability & PortCaps.WRITE
-                    can_sub_write = port_info.capability & PortCaps.SUBS_WRITE
-                    can_read = port_info.capability & PortCaps.READ
-                    can_sub_read = port_info.capability & PortCaps.SUBS_READ
+                if not input and not output:
+                    if only_connectable:
+                        if can_read and can_sub_read:
+                            pass
+                        elif can_write and can_sub_write:
+                            pass
+                        else:
+                            continue
+                    elif not can_read and not can_write:
+                        continue
 
-                    if output:
-                        if not can_write:
-                            continue
-                        if only_connectable and not can_sub_write:
-                            continue
-
-                    if input:
-                        if not can_read:
-                            continue
-                        if only_connectable and not can_sub_read:
-                            continue
-
-                    if not input and not output:
-                        if only_connectable:
-                            if can_read and can_sub_read:
-                                pass
-                            elif can_write and can_sub_write:
-                                pass
-                            else:
-                                continue
-                        elif not can_read and not can_write:
-                            continue
-
-                    port_info.client_name = client_name
-                    result.append(port_info)
-        finally:
-            if client_ainfo is not None:
-                alsa.snd_seq_client_info_free(client_ainfo)
-            if port_ainfo is not None:
-                alsa.snd_seq_port_info_free(port_ainfo)
+                port_info.client_name = client_name
+                result.append(port_info)
 
         if callable(sort):
             sort_key = sort
@@ -525,22 +506,19 @@ class SequencerClientBase:
         sub_p = ffi.new("snd_seq_port_subscribe_t **")
         err = alsa.snd_seq_port_subscribe_malloc(sub_p)
         _check_alsa_error(err)
-        sub = sub_p[0]
-        try:
-            addr = ffi.new("snd_seq_addr_t *")
-            addr.client, addr.port = sender.client_id, sender.port_id
-            alsa.snd_seq_port_subscribe_set_sender(sub, addr)
-            addr.client, addr.port = dest.client_id, dest.port_id
-            alsa.snd_seq_port_subscribe_set_dest(sub, addr)
-            if queue_id is not None:
-                alsa.snd_seq_port_subscribe_set_queue(sub, queue_id)
-            alsa.snd_seq_port_subscribe_set_exclusive(sub, int(exclusive))
-            alsa.snd_seq_port_subscribe_set_time_update(sub, int(time_update))
-            alsa.snd_seq_port_subscribe_set_time_real(sub, int(time_real))
-            err = func(self.handle, sub)
-            _check_alsa_error(err)
-        finally:
-            alsa.snd_seq_port_subscribe_free(sub)
+        sub = ffi.gc(sub_p[0], alsa.snd_seq_port_subscribe_free)
+        addr = ffi.new("snd_seq_addr_t *")
+        addr.client, addr.port = sender.client_id, sender.port_id
+        alsa.snd_seq_port_subscribe_set_sender(sub, addr)
+        addr.client, addr.port = dest.client_id, dest.port_id
+        alsa.snd_seq_port_subscribe_set_dest(sub, addr)
+        if queue_id is not None:
+            alsa.snd_seq_port_subscribe_set_queue(sub, queue_id)
+        alsa.snd_seq_port_subscribe_set_exclusive(sub, int(exclusive))
+        alsa.snd_seq_port_subscribe_set_time_update(sub, int(time_update))
+        alsa.snd_seq_port_subscribe_set_time_real(sub, int(time_real))
+        err = func(self.handle, sub)
+        _check_alsa_error(err)
 
     def subscribe_port(self, sender: AddressType, dest: AddressType, *,
                        queue: Optional[Union[Queue, int]] = None,

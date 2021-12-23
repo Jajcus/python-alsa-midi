@@ -1,6 +1,6 @@
 
 from enum import IntFlag
-from typing import TYPE_CHECKING, List, NewType, Optional, Tuple
+from typing import TYPE_CHECKING, List, NewType, Optional
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -132,7 +132,6 @@ class Port:
 
 
 _snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)
-_snd_seq_port_info_t_p = NewType("_snd_seq_port_info_t", Tuple[_snd_seq_port_info_t])
 
 
 class PortInfo:
@@ -218,10 +217,10 @@ class PortInfo:
                 )
 
     def _to_alsa(self) -> _snd_seq_port_info_t:
-        info_p: _snd_seq_port_info_t_p = ffi.new("snd_seq_port_info_t **")
+        info_p = ffi.new("snd_seq_port_info_t **")
         err = alsa.snd_seq_port_info_malloc(info_p)
         _check_alsa_error(err)
-        info = info_p[0]
+        info = ffi.gc(info_p[0], alsa.snd_seq_port_info_free)
         alsa.snd_seq_port_info_set_client(info, self.client_id)
         alsa.snd_seq_port_info_set_port(info, self.port_id)
         alsa.snd_seq_port_info_set_name(info, self.name.encode())

@@ -205,7 +205,7 @@ def test_port_info():
     info_p = ffi.new("snd_seq_port_info_t **")
     err = alsa.snd_seq_port_info_malloc(info_p)
     assert err >= 0
-    alsa_info = info_p[0]
+    alsa_info = ffi.gc(info_p[0], alsa.snd_seq_port_info_free)
 
     alsa.snd_seq_port_info_set_client(alsa_info, 115)
     alsa.snd_seq_port_info_set_port(alsa_info, 117)

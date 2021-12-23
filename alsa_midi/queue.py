@@ -45,16 +45,14 @@ class Queue:
 
     def set_tempo(self, tempo: int = 500000, ppq: int = 96):
         handle = self._get_client_handle()
-        q_tempo = ffi.new("snd_seq_queue_tempo_t **", ffi.NULL)
-        err = alsa.snd_seq_queue_tempo_malloc(q_tempo)
+        q_tempo_p = ffi.new("snd_seq_queue_tempo_t **", ffi.NULL)
+        err = alsa.snd_seq_queue_tempo_malloc(q_tempo_p)
         _check_alsa_error(err)
-        try:
-            alsa.snd_seq_queue_tempo_set_tempo(q_tempo[0], tempo)
-            alsa.snd_seq_queue_tempo_set_ppq(q_tempo[0], ppq)
-            err = alsa.snd_seq_set_queue_tempo(handle, self.queue_id, q_tempo[0])
-            _check_alsa_error(err)
-        finally:
-            alsa.snd_seq_queue_tempo_free(q_tempo[0])
+        q_tempo = ffi.gc(q_tempo_p[0], alsa.snd_seq_queue_tempo_free)
+        alsa.snd_seq_queue_tempo_set_tempo(q_tempo, tempo)
+        alsa.snd_seq_queue_tempo_set_ppq(q_tempo, ppq)
+        err = alsa.snd_seq_set_queue_tempo(handle, self.queue_id, q_tempo)
+        _check_alsa_error(err)
 
     def control(self, event_type: EventType, value: int = 0):
         handle = self._get_client_handle()

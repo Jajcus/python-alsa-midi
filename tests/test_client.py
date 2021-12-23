@@ -131,7 +131,7 @@ def test_client_info():
     info_p = ffi.new("snd_seq_client_info_t **")
     err = alsa.snd_seq_client_info_malloc(info_p)
     assert err >= 0
-    alsa_info = info_p[0]
+    alsa_info = ffi.gc(info_p[0], alsa.snd_seq_client_info_free)
     alsa.snd_seq_client_info_set_client(alsa_info, 44)
     alsa.snd_seq_client_info_set_name(alsa_info, b"client_info_test4")
     alsa.snd_seq_client_info_set_broadcast_filter(alsa_info, 1)
