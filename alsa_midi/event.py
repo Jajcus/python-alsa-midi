@@ -122,6 +122,31 @@ class EventType(IntEnum):
         return obj
 
 
+MIDI_BYTES_EVENTS = [
+    EventType.NOTEOFF,
+    EventType.NOTEON,
+    EventType.KEYPRESS,
+    EventType.CONTROLLER,
+    EventType.PGMCHANGE,
+    EventType.CHANPRESS,
+    EventType.PITCHBEND,
+    EventType.SYSEX,
+    EventType.QFRAME,
+    EventType.SONGPOS,
+    EventType.SONGSEL,
+    EventType.TUNE_REQUEST,
+    EventType.CLOCK,
+    EventType.START,
+    EventType.CONTINUE,
+    EventType.STOP,
+    EventType.SENSING,
+    EventType.RESET,
+    EventType.CONTROL14,
+    EventType.NONREGPARAM,
+    EventType.REGPARAM,
+    ]
+
+
 class EventFlags(IntFlag):
     TIME_STAMP_TICK = alsa.SND_SEQ_TIME_STAMP_TICK
     TIME_STAMP_REAL = alsa.SND_SEQ_TIME_STAMP_REAL
@@ -159,7 +184,7 @@ class Event:
     raw_data: Optional[bytes]
 
     def __init__(self,
-                 type: Optional[EventType],
+                 type: Optional[EventType] = None,
                  *,
                  flags: Optional[Union[EventFlags, int]] = 0,
                  tag: int = 0,
@@ -302,7 +327,7 @@ class MidiBytesEvent(Event):
     def __init__(self,
                  midi_bytes: Union[bytes, Iterable[int]],
                  **kwargs):
-        super().__init__(None, **kwargs)
+        super().__init__(**kwargs)
         self.midi_bytes = bytes(midi_bytes)
 
     def __repr__(self):
@@ -967,5 +992,6 @@ __all__ = [
         "RealTime",
         "EventType", "EventFlags", "Event", "MidiBytesEvent",
         "NoteEventBase",
-        "NoteOnEvent", "NoteOffEvent"
+        "NoteOnEvent", "NoteOffEvent",
+        "MIDI_BYTES_EVENTS",
         ]

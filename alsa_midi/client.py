@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, List, NewType, Optional, Tuple, Uni
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
-from .event import Event, EventType, MidiBytesEvent, _snd_seq_event_t
+from .event import MIDI_BYTES_EVENTS, Event, EventType, MidiBytesEvent, _snd_seq_event_t
 from .exceptions import StateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
                    WRITE_PORT_PREFERRED_TYPES, Port, PortCaps, PortInfo, PortType,
@@ -159,6 +159,16 @@ class SequencerClientBase:
         assert (pfds[0].events & select.POLLIN) and (pfds[0].events & select.POLLOUT)
         self._fd = pfds[0].fd
 
+    def _get_event_parser(self):
+        parser = self._event_parser
+        if parser is None:
+            parser_p = ffi.new("snd_midi_event_t **")
+            err = alsa.snd_midi_event_new(1024, parser_p)
+            _check_alsa_error(err)
+            parser = ffi.gc(parser_p[0], alsa.snd_midi_event_free)
+            self._event_parser = parser
+        return parser
+
     def create_port(self,
                     name: str,
                     caps: PortCaps = RW_PORT,
@@ -239,17 +249,34 @@ class SequencerClientBase:
         err = alsa.snd_seq_drop_output(self.handle)
         _check_alsa_error(err)
 
-    def _event_input(self) -> Tuple[int, Optional[Event]]:
+    def _event_input(self, prefer_bytes: bool = False) -> Tuple[int, Optional[Event]]:
         buf = ffi.new("snd_seq_event_t**", ffi.NULL)
         result = alsa.snd_seq_event_input(self.handle, buf)
-        if result >= 0:
-            cls = Event._specialized.get(buf[0].type, Event)
-            return result, cls._from_alsa(buf[0])
-        else:
+        if result < 0:
             return result, None
+        alsa_event = buf[0]
+        try:
+            if prefer_bytes and alsa_event.type in MIDI_BYTES_EVENTS:
+                parser = self._get_event_parser()
+                if alsa_event.type == EventType.SYSEX:
+                    buf_len = alsa_event.data.ext.len
+                else:
+                    buf_len = 12
+                bytes_buf = ffi.new("char[]", buf_len)
+                count = alsa.snd_midi_event_decode(parser, bytes_buf, buf_len, alsa_event)
+                if count < 0:
+                    return count, None
+                event = MidiBytesEvent._from_alsa(alsa_event,
+                                                  midi_bytes=ffi.buffer(bytes_buf, count))
+                return result, event
+            else:
+                cls = Event._specialized.get(buf[0].type, Event)
+                return result, cls._from_alsa(alsa_event)
+        finally:
+            alsa.snd_seq_free_event(alsa_event)
 
-    def event_input(self):
-        result, event = self._event_input()
+    def event_input(self, prefer_bytes: bool = False):
+        result, event = self._event_input(prefer_bytes=prefer_bytes)
         _check_alsa_error(result)
         return event
 
@@ -272,13 +299,7 @@ class SequencerClientBase:
         else:
             alsa_event, midi_bytes = remainder
 
-        parser = self._event_parser
-        if parser is None:
-            parser_p = ffi.new("snd_midi_event_t **")
-            err = alsa.snd_midi_event_new(1024, parser_p)
-            _check_alsa_error(err)
-            parser = ffi.gc(parser_p[0], alsa.snd_midi_event_free)
-            self._event_parser = parser
+        parser = self._get_event_parser()
 
         length = len(midi_bytes)
         processed = alsa.snd_midi_event_encode(parser,
@@ -624,14 +645,14 @@ class SequencerClient(SequencerClientBase):
         self._write_poll = select.poll()
         self._write_poll.register(self._fd, select.POLLOUT)
 
-    def event_input(self, timeout: Optional[float] = None):
+    def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None):
         if timeout:
             until = time.monotonic() + timeout
         else:
             until = None
 
         while True:
-            result, event = self._event_input()
+            result, event = self._event_input(prefer_bytes=prefer_bytes)
             if result != -errno.EAGAIN:
                 break
             if until is not None:
@@ -712,9 +733,9 @@ class AsyncSequencerClient(SequencerClientBase):
     async def aclose(self):
         self.close()
 
-    async def event_input(self, timeout: Optional[float] = None):
+    async def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None):
 
-        result, event = self._event_input()
+        result, event = self._event_input(prefer_bytes=prefer_bytes)
         if result != -errno.EAGAIN:
             _check_alsa_error(result)
             return event
@@ -726,7 +747,7 @@ class AsyncSequencerClient(SequencerClientBase):
         def reader_cb():
             result = None
             try:
-                result, event = self._event_input()
+                result, event = self._event_input(prefer_bytes=prefer_bytes)
             except Exception as err:
                 fut.set_exception(err)
                 return
