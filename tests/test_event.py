@@ -3,7 +3,7 @@ import pytest
 
 from alsa_midi import (ActiveSensingEvent, Address, ChannelPressureEvent, ClockEvent,
                        ContinueEvent, Control14BitChangeEvent, ControlChangeEvent, EchoEvent,
-                       Event, EventFlags, EventType, KeyPressEvent, KeySignatureEvent,
+                       Event, EventFlags, EventType, KeyPressureEvent, KeySignatureEvent,
                        MidiBytesEvent, NonRegisteredParameterChangeEvent, NoteEvent, NoteOffEvent,
                        NoteOnEvent, OSSEvent, PitchBendEvent, ProgramChangeEvent, QueueSkewEvent,
                        RealTime, RegisteredParameterChangeEvent, ResetEvent, ResultEvent,
@@ -487,15 +487,15 @@ def test_note_off_event():
     assert repr(event) == "<NoteOffEvent channel=5 note=63 velocity=6>"
 
 
-def test_key_press_event():
-    event = KeyPressEvent(note=61, tag=3)
-    assert isinstance(event, KeyPressEvent)
+def test_key_pressure_event():
+    event = KeyPressureEvent(note=61, tag=3)
+    assert isinstance(event, KeyPressureEvent)
     assert isinstance(event, Event)
     assert event.type == EventType.KEYPRESS
     assert event.note == 61
     assert event.channel == 0
     assert event.velocity == 127
-    assert repr(event) == "<KeyPressEvent channel=0 note=61 velocity=127>"
+    assert repr(event) == "<KeyPressureEvent channel=0 note=61 velocity=127>"
 
     alsa_event = ffi.new("snd_seq_event_t *")
     result = event._to_alsa(alsa_event)
@@ -506,14 +506,14 @@ def test_key_press_event():
     assert alsa_event.data.note.velocity == 127
     assert alsa_event.tag == 3
 
-    event = KeyPressEvent(note=62, channel=5, velocity=6, tag=9)
-    assert isinstance(event, KeyPressEvent)
+    event = KeyPressureEvent(note=62, channel=5, velocity=6, tag=9)
+    assert isinstance(event, KeyPressureEvent)
     assert isinstance(event, Event)
     assert event.type == EventType.KEYPRESS
     assert event.note == 62
     assert event.channel == 5
     assert event.velocity == 6
-    assert repr(event) == "<KeyPressEvent channel=5 note=62 velocity=6>"
+    assert repr(event) == "<KeyPressureEvent channel=5 note=62 velocity=6>"
 
     alsa_event = ffi.new("snd_seq_event_t *")
     result = event._to_alsa(alsa_event)
@@ -524,14 +524,14 @@ def test_key_press_event():
     assert alsa_event.data.note.velocity == 6
     assert alsa_event.tag == 9
 
-    event = KeyPressEvent(62, 5, 6, tag=9)
-    assert isinstance(event, KeyPressEvent)
+    event = KeyPressureEvent(62, 5, 6, tag=9)
+    assert isinstance(event, KeyPressureEvent)
     assert isinstance(event, Event)
     assert event.type == EventType.KEYPRESS
     assert event.note == 62
     assert event.channel == 5
     assert event.velocity == 6
-    assert repr(event) == "<KeyPressEvent channel=5 note=62 velocity=6>"
+    assert repr(event) == "<KeyPressureEvent channel=5 note=62 velocity=6>"
 
     alsa_event = ffi.new("snd_seq_event_t *")
     alsa_event.type = alsa.SND_SEQ_EVENT_KEYPRESS
@@ -540,14 +540,14 @@ def test_key_press_event():
     alsa_event.data.note.channel = 5
     alsa_event.data.note.velocity = 6
 
-    event = KeyPressEvent._from_alsa(alsa_event)
-    assert isinstance(event, KeyPressEvent)
+    event = KeyPressureEvent._from_alsa(alsa_event)
+    assert isinstance(event, KeyPressureEvent)
     assert event.type == EventType.KEYPRESS
     assert event.tag == 5
     assert event.note == 63
     assert event.channel == 5
     assert event.velocity == 6
-    assert repr(event) == "<KeyPressEvent channel=5 note=63 velocity=6>"
+    assert repr(event) == "<KeyPressureEvent channel=5 note=63 velocity=6>"
 
 
 def test_control_change_event():

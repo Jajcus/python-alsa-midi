@@ -672,7 +672,7 @@ class NoteOffEvent(NoteEventBase):
 
 
 @_specialized_event_class(EventType.KEYPRESS)
-class KeyPressEvent(NoteEventBase):
+class KeyPressureEvent(NoteEventBase):
     pass
 
 
@@ -1021,9 +1021,9 @@ __all__ = [
         "NoteEventBase",
         "MIDI_BYTES_EVENTS",
 
-        "SystemEvent", "ResultEvent", "NoteEvent", "NoteOnEvent", "NoteOffEvent", "KeyPressEvent",
-        "ControlChangeEvent", "ProgramChangeEvent", "ChannelPressureEvent", "PitchBendEvent",
-        "Control14BitChangeEvent", "NonRegisteredParameterChangeEvent",
+        "SystemEvent", "ResultEvent", "NoteEvent", "NoteOnEvent", "NoteOffEvent",
+        "KeyPressureEvent", "ControlChangeEvent", "ProgramChangeEvent", "ChannelPressureEvent",
+        "PitchBendEvent", "Control14BitChangeEvent", "NonRegisteredParameterChangeEvent",
         "RegisteredParameterChangeEvent", "SongPositionPointerEvent", "SongSelectEvent",
         "TimeSignatureEvent", "KeySignatureEvent", "StartEvent", "ContinueEvent", "StopEvent",
         "SetQueuePositionTickEvent", "SetQueuePositionTimeEvent", "SetQueueTempoEvent",
