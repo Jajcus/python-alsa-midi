@@ -201,7 +201,7 @@ class Event:
                  flags: Optional[Union[EventFlags, int]] = 0,
                  tag: int = 0,
                  queue_id: Optional[int] = None,
-                 time: Optional[RealTime] = None,
+                 time: Optional[Union[RealTime, float, int]] = None,
                  tick: Optional[int] = None,
                  source: Optional[AddressType] = None,
                  dest: Optional[AddressType] = None,
@@ -221,7 +221,10 @@ class Event:
         if time is not None and tick is not None:
             raise ValueError("Either 'time' or 'tick' may be set, not both")
 
-        self.time = time
+        if time is not None:
+            self.time = RealTime(time)
+        else:
+            self.time = None
         self.tick = tick
 
         self.relative = relative
