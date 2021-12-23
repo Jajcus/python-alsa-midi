@@ -265,7 +265,7 @@ class Event:
         if cls.type is None:
             kwargs["type"] = EventType(event.type)
         return cls(flags=flags,
-                   tag=event.flags,
+                   tag=event.tag,
                    queue_id=event.queue,
                    time=ev_time,
                    tick=ev_tick,
