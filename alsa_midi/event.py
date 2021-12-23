@@ -1,5 +1,6 @@
 
 from enum import IntEnum, IntFlag
+from functools import total_ordering
 from typing import TYPE_CHECKING, Any, Iterable, NewType, Optional, Union
 
 from ._ffi import alsa, ffi
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from .queue import Queue
 
 
+@total_ordering
 class RealTime:
     __slots__ = ('seconds', 'nanoseconds')
 
@@ -51,6 +53,16 @@ class RealTime:
 
     def __float__(self):
         return float(self.seconds) + self.nanoseconds / 1000000000
+
+    def __eq__(self, other):
+        if not isinstance(other, RealTime):
+            other = RealTime(other)
+        return (self.seconds, self.nanoseconds) == (other.seconds, other.nanoseconds)
+
+    def __lt__(self, other):
+        if not isinstance(other, RealTime):
+            other = RealTime(other)
+        return (self.seconds, self.nanoseconds) < (other.seconds, other.nanoseconds)
 
 
 class EventType(IntEnum):

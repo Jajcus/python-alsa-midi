@@ -64,3 +64,14 @@ def test_negative():
         RealTime(-1)
     with pytest.raises(ValueError):
         RealTime(0, -1)
+
+
+def test_compare():
+    assert RealTime(1, 2) == RealTime(1, 2)
+    assert RealTime(1, 2) != RealTime(3, 4)
+    assert RealTime(1, 2) < RealTime(3, 4)
+    assert RealTime(5, 6) > RealTime(3, 4)  # type: ignore
+    assert RealTime(1, 2) <= RealTime(3, 4)  # type: ignore
+    assert RealTime(5, 6) >= RealTime(3, 4)  # type: ignore
+    assert RealTime(1, 2) <= RealTime(1, 2)  # type: ignore
+    assert RealTime(1, 2) >= RealTime(1, 2)  # type: ignore
