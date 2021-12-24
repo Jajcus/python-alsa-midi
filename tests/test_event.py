@@ -1,16 +1,21 @@
 
 import pytest
 
-from alsa_midi import (ActiveSensingEvent, Address, ChannelPressureEvent, ClockEvent,
+from alsa_midi import (ActiveSensingEvent, Address, BounceEvent, ChannelPressureEvent,
+                       ClientChangeEvent, ClientExitEvent, ClientStartEvent, ClockEvent,
                        ContinueEvent, Control14BitChangeEvent, ControlChangeEvent, EchoEvent,
                        Event, EventFlags, EventType, KeyPressureEvent, KeySignatureEvent,
                        MidiBytesEvent, NonRegisteredParameterChangeEvent, NoteEvent, NoteOffEvent,
-                       NoteOnEvent, OSSEvent, PitchBendEvent, ProgramChangeEvent, QueueSkewEvent,
-                       RealTime, RegisteredParameterChangeEvent, ResetEvent, ResultEvent,
+                       NoteOnEvent, OSSEvent, PitchBendEvent, PortChangeEvent, PortExitEvent,
+                       PortStartEvent, PortSubscribedEvent, PortUnsubscribedEvent,
+                       ProgramChangeEvent, QueueSkewEvent, RealTime,
+                       RegisteredParameterChangeEvent, ResetEvent, ResultEvent,
                        SetQueuePositionTickEvent, SetQueuePositionTimeEvent, SetQueueTempoEvent,
                        SongPositionPointerEvent, SongSelectEvent, StartEvent, StopEvent,
-                       SyncPositionChangedEvent, SystemEvent, TickEvent, TimeSignatureEvent,
-                       TuneRequestEvent, alsa, ffi)
+                       SyncPositionChangedEvent, SysExEvent, SystemEvent, TickEvent,
+                       TimeSignatureEvent, TuneRequestEvent, UserVar0Event, UserVar1Event,
+                       UserVar2Event, UserVar3Event, alsa, ffi)
+from alsa_midi.event import ExternalDataEventBase
 
 
 def test_event():
@@ -1709,3 +1714,541 @@ def test_oss_event():
     assert event.type == EventType.OSS
     assert event.tag == 9
     assert repr(event).startswith("<OSSEvent data=b'12345")
+
+
+def test_client_start_event():
+    event = ClientStartEvent(addr=Address(1, 2))
+    assert isinstance(event, ClientStartEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLIENT_START
+    assert event.addr == Address(1, 2)
+    assert repr(event) == "<ClientStartEvent 1:2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLIENT_START
+    assert alsa_event.data.addr.client == 1
+    assert alsa_event.data.addr.port == 2
+    assert alsa_event.tag == 0
+
+    event = ClientStartEvent((3, 4), tag=5)
+    assert isinstance(event, ClientStartEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLIENT_START
+    assert event.addr == Address(3, 4)
+    assert event.tag == 5
+    assert repr(event) == "<ClientStartEvent 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLIENT_START
+    assert alsa_event.data.addr.client == 3
+    assert alsa_event.data.addr.port == 4
+    assert alsa_event.tag == 5
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CLIENT_START
+    alsa_event.tag = 9
+    alsa_event.data.addr.client = 10
+    alsa_event.data.addr.port = 11
+
+    event = ClientStartEvent._from_alsa(alsa_event)
+    assert isinstance(event, ClientStartEvent)
+    assert event.type == EventType.CLIENT_START
+    assert event.tag == 9
+    assert event.addr == Address(10, 11)
+    assert repr(event) == "<ClientStartEvent 10:11>"
+
+
+def test_client_exit_event():
+    event = ClientExitEvent(addr=Address(1, 2))
+    assert isinstance(event, ClientExitEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLIENT_EXIT
+    assert event.addr == Address(1, 2)
+    assert repr(event) == "<ClientExitEvent 1:2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLIENT_EXIT
+    assert alsa_event.data.addr.client == 1
+    assert alsa_event.data.addr.port == 2
+    assert alsa_event.tag == 0
+
+    event = ClientExitEvent((3, 4), tag=5)
+    assert isinstance(event, ClientExitEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLIENT_EXIT
+    assert event.addr == Address(3, 4)
+    assert event.tag == 5
+    assert repr(event) == "<ClientExitEvent 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLIENT_EXIT
+    assert alsa_event.data.addr.client == 3
+    assert alsa_event.data.addr.port == 4
+    assert alsa_event.tag == 5
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CLIENT_EXIT
+    alsa_event.tag = 9
+    alsa_event.data.addr.client = 10
+    alsa_event.data.addr.port = 11
+
+    event = ClientExitEvent._from_alsa(alsa_event)
+    assert isinstance(event, ClientExitEvent)
+    assert event.type == EventType.CLIENT_EXIT
+    assert event.tag == 9
+    assert event.addr == Address(10, 11)
+    assert repr(event) == "<ClientExitEvent 10:11>"
+
+
+def test_client_change_event():
+    event = ClientChangeEvent(addr=Address(1, 2))
+    assert isinstance(event, ClientChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLIENT_CHANGE
+    assert event.addr == Address(1, 2)
+    assert repr(event) == "<ClientChangeEvent 1:2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLIENT_CHANGE
+    assert alsa_event.data.addr.client == 1
+    assert alsa_event.data.addr.port == 2
+    assert alsa_event.tag == 0
+
+    event = ClientChangeEvent((3, 4), tag=5)
+    assert isinstance(event, ClientChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.CLIENT_CHANGE
+    assert event.addr == Address(3, 4)
+    assert event.tag == 5
+    assert repr(event) == "<ClientChangeEvent 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_CLIENT_CHANGE
+    assert alsa_event.data.addr.client == 3
+    assert alsa_event.data.addr.port == 4
+    assert alsa_event.tag == 5
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_CLIENT_CHANGE
+    alsa_event.tag = 9
+    alsa_event.data.addr.client = 10
+    alsa_event.data.addr.port = 11
+
+    event = ClientChangeEvent._from_alsa(alsa_event)
+    assert isinstance(event, ClientChangeEvent)
+    assert event.type == EventType.CLIENT_CHANGE
+    assert event.tag == 9
+    assert event.addr == Address(10, 11)
+    assert repr(event) == "<ClientChangeEvent 10:11>"
+
+
+def test_port_start_event():
+    event = PortStartEvent(addr=Address(1, 2))
+    assert isinstance(event, PortStartEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_START
+    assert event.addr == Address(1, 2)
+    assert repr(event) == "<PortStartEvent 1:2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_START
+    assert alsa_event.data.addr.client == 1
+    assert alsa_event.data.addr.port == 2
+    assert alsa_event.tag == 0
+
+    event = PortStartEvent((3, 4), tag=5)
+    assert isinstance(event, PortStartEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_START
+    assert event.addr == Address(3, 4)
+    assert event.tag == 5
+    assert repr(event) == "<PortStartEvent 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_START
+    assert alsa_event.data.addr.client == 3
+    assert alsa_event.data.addr.port == 4
+    assert alsa_event.tag == 5
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_PORT_START
+    alsa_event.tag = 9
+    alsa_event.data.addr.client = 10
+    alsa_event.data.addr.port = 11
+
+    event = PortStartEvent._from_alsa(alsa_event)
+    assert isinstance(event, PortStartEvent)
+    assert event.type == EventType.PORT_START
+    assert event.tag == 9
+    assert event.addr == Address(10, 11)
+    assert repr(event) == "<PortStartEvent 10:11>"
+
+
+def test_port_exit_event():
+    event = PortExitEvent(addr=Address(1, 2))
+    assert isinstance(event, PortExitEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_EXIT
+    assert event.addr == Address(1, 2)
+    assert repr(event) == "<PortExitEvent 1:2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_EXIT
+    assert alsa_event.data.addr.client == 1
+    assert alsa_event.data.addr.port == 2
+    assert alsa_event.tag == 0
+
+    event = PortExitEvent((3, 4), tag=5)
+    assert isinstance(event, PortExitEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_EXIT
+    assert event.addr == Address(3, 4)
+    assert event.tag == 5
+    assert repr(event) == "<PortExitEvent 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_EXIT
+    assert alsa_event.data.addr.client == 3
+    assert alsa_event.data.addr.port == 4
+    assert alsa_event.tag == 5
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_PORT_EXIT
+    alsa_event.tag = 9
+    alsa_event.data.addr.client = 10
+    alsa_event.data.addr.port = 11
+
+    event = PortExitEvent._from_alsa(alsa_event)
+    assert isinstance(event, PortExitEvent)
+    assert event.type == EventType.PORT_EXIT
+    assert event.tag == 9
+    assert event.addr == Address(10, 11)
+    assert repr(event) == "<PortExitEvent 10:11>"
+
+
+def test_port_change_event():
+    event = PortChangeEvent(addr=Address(1, 2))
+    assert isinstance(event, PortChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_CHANGE
+    assert event.addr == Address(1, 2)
+    assert repr(event) == "<PortChangeEvent 1:2>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_CHANGE
+    assert alsa_event.data.addr.client == 1
+    assert alsa_event.data.addr.port == 2
+    assert alsa_event.tag == 0
+
+    event = PortChangeEvent((3, 4), tag=5)
+    assert isinstance(event, PortChangeEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_CHANGE
+    assert event.addr == Address(3, 4)
+    assert event.tag == 5
+    assert repr(event) == "<PortChangeEvent 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_CHANGE
+    assert alsa_event.data.addr.client == 3
+    assert alsa_event.data.addr.port == 4
+    assert alsa_event.tag == 5
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_PORT_CHANGE
+    alsa_event.tag = 9
+    alsa_event.data.addr.client = 10
+    alsa_event.data.addr.port = 11
+
+    event = PortChangeEvent._from_alsa(alsa_event)
+    assert isinstance(event, PortChangeEvent)
+    assert event.type == EventType.PORT_CHANGE
+    assert event.tag == 9
+    assert event.addr == Address(10, 11)
+    assert repr(event) == "<PortChangeEvent 10:11>"
+
+
+def test_port_subscribed_event():
+    event = PortSubscribedEvent(connect_sender=Address(1, 2), connect_dest=Address(3, 4))
+    assert isinstance(event, PortSubscribedEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_SUBSCRIBED
+    assert event.connect_sender == Address(1, 2)
+    assert event.connect_dest == Address(3, 4)
+    assert repr(event) == "<PortSubscribedEvent from 1:2 to 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_SUBSCRIBED
+    assert alsa_event.data.connect.sender.client == 1
+    assert alsa_event.data.connect.sender.port == 2
+    assert alsa_event.data.connect.dest.client == 3
+    assert alsa_event.data.connect.dest.port == 4
+    assert alsa_event.tag == 0
+
+    event = PortSubscribedEvent((3, 4), (5, 6), tag=7)
+    assert isinstance(event, PortSubscribedEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_SUBSCRIBED
+    assert event.connect_sender == Address(3, 4)
+    assert event.connect_dest == Address(5, 6)
+    assert event.tag == 7
+    assert repr(event) == "<PortSubscribedEvent from 3:4 to 5:6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_SUBSCRIBED
+    assert alsa_event.data.connect.sender.client == 3
+    assert alsa_event.data.connect.sender.port == 4
+    assert alsa_event.data.connect.dest.client == 5
+    assert alsa_event.data.connect.dest.port == 6
+    assert alsa_event.tag == 7
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_PORT_SUBSCRIBED
+    alsa_event.tag = 9
+    alsa_event.data.connect.sender.client = 10
+    alsa_event.data.connect.sender.port = 11
+    alsa_event.data.connect.dest.client = 12
+    alsa_event.data.connect.dest.port = 13
+
+    event = PortSubscribedEvent._from_alsa(alsa_event)
+    assert isinstance(event, PortSubscribedEvent)
+    assert event.type == EventType.PORT_SUBSCRIBED
+    assert event.tag == 9
+    assert event.connect_sender == Address(10, 11)
+    assert event.connect_dest == Address(12, 13)
+    assert repr(event) == "<PortSubscribedEvent from 10:11 to 12:13>"
+
+
+def test_port_unsubscribed_event():
+    event = PortUnsubscribedEvent(connect_sender=Address(1, 2), connect_dest=Address(3, 4))
+    assert isinstance(event, PortUnsubscribedEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_UNSUBSCRIBED
+    assert event.connect_sender == Address(1, 2)
+    assert event.connect_dest == Address(3, 4)
+    assert repr(event) == "<PortUnsubscribedEvent from 1:2 to 3:4>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_UNSUBSCRIBED
+    assert alsa_event.data.connect.sender.client == 1
+    assert alsa_event.data.connect.sender.port == 2
+    assert alsa_event.data.connect.dest.client == 3
+    assert alsa_event.data.connect.dest.port == 4
+    assert alsa_event.tag == 0
+
+    event = PortUnsubscribedEvent((3, 4), (5, 6), tag=7)
+    assert isinstance(event, PortUnsubscribedEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.PORT_UNSUBSCRIBED
+    assert event.connect_sender == Address(3, 4)
+    assert event.connect_dest == Address(5, 6)
+    assert event.tag == 7
+    assert repr(event) == "<PortUnsubscribedEvent from 3:4 to 5:6>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_PORT_UNSUBSCRIBED
+    assert alsa_event.data.connect.sender.client == 3
+    assert alsa_event.data.connect.sender.port == 4
+    assert alsa_event.data.connect.dest.client == 5
+    assert alsa_event.data.connect.dest.port == 6
+    assert alsa_event.tag == 7
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_PORT_UNSUBSCRIBED
+    alsa_event.tag = 9
+    alsa_event.data.connect.sender.client = 10
+    alsa_event.data.connect.sender.port = 11
+    alsa_event.data.connect.dest.client = 12
+    alsa_event.data.connect.dest.port = 13
+
+    event = PortUnsubscribedEvent._from_alsa(alsa_event)
+    assert isinstance(event, PortUnsubscribedEvent)
+    assert event.type == EventType.PORT_UNSUBSCRIBED
+    assert event.tag == 9
+    assert event.connect_sender == Address(10, 11)
+    assert event.connect_dest == Address(12, 13)
+    assert repr(event) == "<PortUnsubscribedEvent from 10:11 to 12:13>"
+
+
+def test_sysex_event():
+    event = SysExEvent(data=b"\xf012345\xf7")
+    assert isinstance(event, SysExEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SYSEX
+    event.data == b"\xf012345\xf7"
+    assert repr(event) == "<SysExEvent data=b'\\xf012345\\xf7'>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SYSEX
+    assert alsa_event.tag == 0
+    assert alsa_event.data.ext.len == 7
+    assert EventFlags.EVENT_LENGTH_VARIABLE in EventFlags(alsa_event.flags)
+    assert ffi.buffer(alsa_event.data.ext.ptr, 7)[:] == b"\xf012345\xf7"
+
+    event = SysExEvent(b"abcd", tag=3)
+    assert isinstance(event, SysExEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.SYSEX
+    assert event.tag == 3
+    assert repr(event) == "<SysExEvent data=b'abcd'>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_SYSEX
+    assert alsa_event.tag == 3
+    assert alsa_event.data.ext.len == 4
+    assert ffi.buffer(alsa_event.data.ext.ptr, 4)[:] == b"abcd"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_SYSEX
+    alsa_event.flags = EventFlags.EVENT_LENGTH_VARIABLE
+    alsa_event.tag = 9
+    alsa_event.data.ext.len = 10
+    data_bytes = b"0123456789"
+    alsa_event.data.ext.ptr = ffi.from_buffer(data_bytes)
+
+    event = SysExEvent._from_alsa(alsa_event)
+    assert isinstance(event, SysExEvent)
+    assert event.type == EventType.SYSEX
+    assert event.tag == 9
+    assert event.data == b"0123456789"
+    assert repr(event) == "<SysExEvent data=b'0123456789'>"
+
+
+def test_bounce_event():
+    event = BounceEvent(data=b"\xf012345\xf7")
+    assert isinstance(event, BounceEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.BOUNCE
+    event.data == b"\xf012345\xf7"
+    assert repr(event) == "<BounceEvent data=b'\\xf012345\\xf7'>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_BOUNCE
+    assert alsa_event.tag == 0
+    assert alsa_event.data.ext.len == 7
+    assert EventFlags.EVENT_LENGTH_VARIABLE in EventFlags(alsa_event.flags)
+    assert ffi.buffer(alsa_event.data.ext.ptr, 7)[:] == b"\xf012345\xf7"
+
+    event = BounceEvent(b"abcd", tag=3)
+    assert isinstance(event, BounceEvent)
+    assert isinstance(event, Event)
+    assert event.type == EventType.BOUNCE
+    assert event.tag == 3
+    assert repr(event) == "<BounceEvent data=b'abcd'>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == alsa.SND_SEQ_EVENT_BOUNCE
+    assert alsa_event.tag == 3
+    assert alsa_event.data.ext.len == 4
+    assert ffi.buffer(alsa_event.data.ext.ptr, 4)[:] == b"abcd"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = alsa.SND_SEQ_EVENT_BOUNCE
+    alsa_event.flags = EventFlags.EVENT_LENGTH_VARIABLE
+    alsa_event.tag = 9
+    alsa_event.data.ext.len = 10
+    data_bytes = b"0123456789"
+    alsa_event.data.ext.ptr = ffi.from_buffer(data_bytes)
+
+    event = BounceEvent._from_alsa(alsa_event)
+    assert isinstance(event, BounceEvent)
+    assert event.type == EventType.BOUNCE
+
+    assert event.tag == 9
+    assert event.data == b"0123456789"
+    assert repr(event) == "<BounceEvent data=b'0123456789'>"
+
+
+@pytest.mark.parametrize("event_class,event_type",
+                         [(UserVar0Event, EventType.USR_VAR0),
+                          (UserVar1Event, EventType.USR_VAR1),
+                          (UserVar2Event, EventType.USR_VAR2),
+                          (UserVar3Event, EventType.USR_VAR3)])
+def test_user_var_event(event_class, event_type):
+    event = event_class(data=b"\xf012345\xf7")
+    assert isinstance(event, event_class)
+    assert isinstance(event, Event)
+    assert isinstance(event, ExternalDataEventBase)
+    assert event.type == event_type
+    event.data == b"\xf012345\xf7"
+    assert repr(event) == f"<{event_class.__name__} data=b'\\xf012345\\xf7'>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == event_type
+    assert alsa_event.tag == 0
+    assert alsa_event.data.ext.len == 7
+    assert EventFlags.EVENT_LENGTH_VARIABLE in EventFlags(alsa_event.flags)
+    assert ffi.buffer(alsa_event.data.ext.ptr, 7)[:] == b"\xf012345\xf7"
+
+    event = event_class(b"abcd", tag=3)
+    assert isinstance(event, event_class)
+    assert isinstance(event, Event)
+    assert event.type == event_type
+    assert event.tag == 3
+    assert repr(event) == f"<{event_class.__name__} data=b'abcd'>"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    result = event._to_alsa(alsa_event)
+    assert result is alsa_event
+    assert alsa_event.type == event_type
+    assert alsa_event.tag == 3
+    assert alsa_event.data.ext.len == 4
+    assert ffi.buffer(alsa_event.data.ext.ptr, 4)[:] == b"abcd"
+
+    alsa_event = ffi.new("snd_seq_event_t *")
+    alsa_event.type = event_type
+    alsa_event.flags = EventFlags.EVENT_LENGTH_VARIABLE
+    alsa_event.tag = 9
+    alsa_event.data.ext.len = 10
+    data_bytes = b"0123456789"
+    alsa_event.data.ext.ptr = ffi.from_buffer(data_bytes)
+
+    event = event_class._from_alsa(alsa_event)
+    assert isinstance(event, event_class)
+    assert event.type == event_type
+
+    assert event.tag == 9
+    assert event.data == b"0123456789"
+    assert repr(event) == f"<{event_class.__name__} data=b'0123456789'>"
