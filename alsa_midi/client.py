@@ -104,6 +104,14 @@ class ClientInfo:
 
 
 class SequencerClientBase:
+    """Base class for :class:`SequencerClient` and :class:`AsyncSequencerClient`.
+    :param client_name: Client name
+    :param streams: client streams open type
+    :param mode: open mode (should be: :attr:`OpenMode.NONBLOCK`)
+
+    :ivar client_id: ALSA client id
+    :ivar handle: ALSA client handle (for use with the cffi bindings)
+    """
     client_id: int
     handle: _snd_seq_t
     _handle_p: _snd_seq_t_p
@@ -345,6 +353,15 @@ class SequencerClientBase:
                             queue: Union['Queue', int] = None,
                             port: Union['Port', int] = None,
                             dest: AddressType = None) -> int:
+        """Output an event to a buffer.
+
+        The event won't be sent, it will just be appended to the output buffer.
+
+        The method never blocks, but may raise :exc:`ALSAError` with
+        :attr:`ALSAError.errnum` = - :data:`errno.EAGAIN` when the buffer is full.
+
+        :return: Number of bytes used in the output buffer.
+        """
         self._check_handle()
         remainder = None
         while True:
@@ -636,16 +653,32 @@ class SequencerClientBase:
 
 
 class SequencerClient(SequencerClientBase):
-    def __init__(self, *args, **kwargs):
+    """ALSA sequencer client connection.
+
+    This is the main interface to interact with the sequencer.  Provides
+    synchronous (blocking) event I/O.
+
+    :param client_name: client name for the connection
+    """
+
+    def __init__(self, client_name: str, *args, **kwargs):
         if "mode" in kwargs and not kwargs["mode"] & OpenMode.NONBLOCK:
             raise ValueError("NONBLOCK open mode must be used")
-        super().__init__(*args, **kwargs)
+        super().__init__(client_name, *args, **kwargs)
         self._read_poll = select.poll()
         self._read_poll.register(self._fd, select.POLLIN)
         self._write_poll = select.poll()
         self._write_poll.register(self._fd, select.POLLOUT)
 
-    def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None):
+    def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None
+                    ) -> Optional[Event]:
+        """Wait for and receive an incoming event.
+
+        :param prefer_bytes: set to `True` to return :class:`MidiBytesEvent` when possible.
+        :param timeout: maximum time (in seconds) to wait for an event. Default: wait forever.
+
+        :return: The event received or `None` if the timeout has been reached.
+        """
         if timeout:
             until = time.monotonic() + timeout
         else:
@@ -697,6 +730,13 @@ class SequencerClient(SequencerClientBase):
         return result
 
     def drain_output(self) -> int:
+        """Send events in the output queue to the sequencer.
+
+        May block when the kernel-side buffer is full.
+
+        :return: Number of bytes remaining in the buffer.
+        """
+
         self._check_handle()
 
         def func(remainder=None):
@@ -710,6 +750,15 @@ class SequencerClient(SequencerClientBase):
                      queue: Union['Queue', int] = None,
                      port: Union['Port', int] = None,
                      dest: AddressType = None) -> int:
+        """Output an event.
+
+        The event will be appended to the output buffer and sent only when the
+        buffer is full. Use :meth:`drain_output` to force sending of the events buffered.
+
+        May block when both the client-side and the kernel-side buffers are full.
+
+        :return: Number of bytes used in the output buffer.
+        """
         self._check_handle()
         func = partial(self._event_output, event, queue, port, dest)
         return self._event_output_wait(func)
@@ -719,6 +768,13 @@ class SequencerClient(SequencerClientBase):
                             queue: Union['Queue', int] = None,
                             port: Union['Port', int] = None,
                             dest: AddressType = None) -> int:
+        """Output an event without buffering.
+
+        The event will be sent immediately. The function may block when the
+        kernel-side buffer is full.
+
+        :return: Number of bytes sent to the sequencer.
+        """
         self._check_handle()
         func = partial(self._event_output_direct, event, queue, port, dest)
         return self._event_output_wait(func)

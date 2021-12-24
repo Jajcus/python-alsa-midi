@@ -8,3 +8,4 @@ __pycache__
 /build
 /tests/alsa_midi
 /examples/alsa_midi
+/docs/_build
