@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 
 class PortCaps(IntFlag):
+    """Port capability flags."""
     _NONE = 0
     READ = alsa.SND_SEQ_PORT_CAP_READ
     WRITE = alsa.SND_SEQ_PORT_CAP_WRITE
@@ -24,6 +25,7 @@ class PortCaps(IntFlag):
 
 
 class PortType(IntFlag):
+    """Port type flags."""
     ANY = 0
     SPECIFIC = alsa.SND_SEQ_PORT_TYPE_SPECIFIC
     MIDI_GENERIC = alsa.SND_SEQ_PORT_TYPE_MIDI_GENERIC
@@ -64,6 +66,7 @@ DEFAULT_PORT_TYPE = PortType.MIDI_GENERIC | PortType.SOFTWARE
 
 
 class Port:
+    """Sequencer port."""
     client_id: int
     port_id: int
 

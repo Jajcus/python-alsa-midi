@@ -5,7 +5,7 @@ import select
 import time
 from enum import IntEnum, IntFlag
 from functools import partial
-from typing import Any, Awaitable, Callable, List, NewType, Optional, Tuple, Union, overload
+from typing import Any, Callable, List, NewType, Optional, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -23,16 +23,19 @@ _snd_midi_event_t = NewType("_snd_midi_event_t", object)
 
 
 class StreamOpenType(IntFlag):
+    """Stream open type flags."""
     OUTPUT = alsa.SND_SEQ_OPEN_OUTPUT
     INPUT = alsa.SND_SEQ_OPEN_INPUT
     DUPLEX = alsa.SND_SEQ_OPEN_DUPLEX
 
 
 class OpenMode(IntFlag):
+    """Sequencer client open mode flags."""
     NONBLOCK = alsa.SND_SEQ_NONBLOCK
 
 
 class ClientType(IntEnum):
+    """Client type constants."""
     _UNSET = 0
     USER = alsa.SND_SEQ_USER_CLIENT
     KERNEL = alsa.SND_SEQ_KERNEL_CLIENT
@@ -42,6 +45,30 @@ _snd_seq_client_info_t = NewType("_snd_seq_client_info_t", object)
 
 
 class ClientInfo:
+    """Client information.
+
+    Represents data from :alsa:`snd_seq_client_info_t`
+
+    :param client_id: client identifier
+    :param name: client name
+    :param broadcast_filter: broadcast filter usage
+    :param error_bounce: error-bounce usage
+    :param type: client type
+    :param card_id: card identifier for hardware clients
+    :param pid: process id for software clients
+    :param num_ports: number of opened ports
+    :param event_lost: number of lost events
+
+    :ivar client_id: client identifier
+    :ivar name: client name
+    :ivar broadcast_filter: broadcast filter usage
+    :ivar error_bounce: error-bounce usage
+    :ivar type: client type
+    :ivar card_id: card identifier for hardware clients
+    :ivar pid: process id for software clients
+    :ivar num_ports: number of opened ports
+    :ivar event_lost: number of lost events
+    """
     client_id: int
     name: str
     broadcast_filter: bool
@@ -74,6 +101,7 @@ class ClientInfo:
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_client_info_t):
+        """Create a ClientInfo object from ALSA :alsa:`snd_seq_client_info_t`."""
         broadcast_filter = alsa.snd_seq_client_info_get_broadcast_filter(info)
         error_bounce = alsa.snd_seq_client_info_get_broadcast_filter(info)
         card_id = alsa.snd_seq_client_info_get_card(info)
@@ -92,6 +120,7 @@ class ClientInfo:
                 )
 
     def _to_alsa(self) -> _snd_seq_client_info_t:
+        """Create a an ALSA :alsa:`snd_seq_client_info_t` object from self."""
         info_p = ffi.new("snd_seq_client_info_t **")
         err = alsa.snd_seq_client_info_malloc(info_p)
         _check_alsa_error(err)
@@ -147,14 +176,20 @@ class SequencerClientBase:
             raise StateError("Already closed")
 
     def close(self):
+        """Close the client connection and release any associated resources.
+
+        The SequencerClient object won't be usable any more.
+        """
         if self._handle_p is None:
             return
         if self._handle_p[0] != ffi.NULL:
             alsa.snd_seq_close(self._handle_p[0])
         self._handle_p = None  # type: ignore
         self.handle = None  # type: ignore
+        self._event_parser = None
 
     def _get_fds(self):
+        """Get the file descriptor number for the client connection into :data:`self._fd`."""
         pfds_count = alsa.snd_seq_poll_descriptors_count(self.handle,
                                                          select.POLLIN | select.POLLOUT)
         # current ALSA does not use more than one fd
@@ -190,6 +225,25 @@ class SequencerClientBase:
                     timestamp_real: Optional[bool] = None,
                     timestamp_queue: Optional[Union[Queue, int]] = None,
                     ) -> Port:
+        """Create a sequencer port.
+
+        Wraps :alsa:`snd_seq_create_port` or
+        :alsa:`snd_seq_create_simple_port`.
+
+        :param name: port name
+        :param caps: port capability flags
+        :param type: port type flags
+        :param port_id: requested port id
+        :param midi_channels: number of MIDI channels
+        :param midi_voices: number of MIDI voices
+        :param synth_voices: number of synth voices
+        :param timestamping: request timestamping of incoming events
+        :param timestamp_real: timestamp events with real time (otherwise MIDI
+                               ticks are used)
+        :param timestamp_queue: queue to use for timestamping
+
+        :return: sequencer port created
+        """
         self._check_handle()
         extra = [port_id, midi_channels, midi_voices, synth_voices,
                  timestamping, timestamp_real, timestamp_queue]
@@ -229,6 +283,14 @@ class SequencerClientBase:
         return Port(self, port)
 
     def create_queue(self, name: str = None) -> Queue:
+        """Create a new queue.
+
+        Wraps :alsa:`snd_seq_alloc_named_queue` or :alsa:`snd_seq_alloc_queue`.
+
+        :param name: queue name
+
+        :return: queue object created.
+        """
         self._check_handle()
         if name is not None:
             queue = alsa.snd_seq_alloc_named_queue(self.handle, name.encode("utf-8"))
@@ -238,21 +300,37 @@ class SequencerClientBase:
         return Queue(self, queue)
 
     def drop_input(self):
+        """Remove all incoming events in the input buffer and sequencer queue.
+
+        Wraps :alsa:`snd_seq_drop_input`.
+        """
         self._check_handle()
         err = alsa.snd_seq_drop_input(self.handle)
         _check_alsa_error(err)
 
-    def drop_buffer(self):
+    def drop_input_buffer(self):
+        """Remove all incoming events in the input buffer.
+
+        Wraps :alsa:`snd_seq_drop_input_buffer`.
+        """
         self._check_handle()
         err = alsa.snd_seq_drop_input_buffer(self.handle)
         _check_alsa_error(err)
 
     def drain_output(self):
+        """Send any outgoing events from the output buffer to the sequencer.
+
+        Wraps :alsa:`snd_seq_drain_output`.
+        """
         self._check_handle()
         err = alsa.snd_seq_drain_output(self.handle)
         _check_alsa_error(err)
 
     def drop_output(self):
+        """Remove all events from the output buffer.
+
+        Wraps :alsa:`snd_seq_drop_output`.
+        """
         self._check_handle()
         err = alsa.snd_seq_drop_output(self.handle)
         _check_alsa_error(err)
@@ -284,6 +362,16 @@ class SequencerClientBase:
             alsa.snd_seq_free_event(alsa_event)
 
     def event_input(self, prefer_bytes: bool = False):
+        """Receive an incoming event.
+
+        When no event is available :class:`ALSAError` will be raised with `errnum` set to
+        -\xa0:data:`errno.EAGAIN`.
+
+        :param prefer_bytes: set to `True` to return :class:`MidiBytesEvent` when possible.
+        :param timeout: maximum time (in seconds) to wait for an event. Default: wait forever.
+
+        :return: The event received or `None` if the timeout has been reached.
+        """
         result, event = self._event_input(prefer_bytes=prefer_bytes)
         _check_alsa_error(result)
         return event
@@ -294,7 +382,25 @@ class SequencerClientBase:
                        port: Union['Port', int] = None,
                        dest: AddressType = None,
                        remainder: Optional[Any] = None) -> Tuple[_snd_seq_event_t, Any]:
+        """Prepare ALSA :alsa:`snd_seq_event_t` for given `event` object for output.
 
+        For :class:`alsa_midi.MidiBytesEvent` may need to be called more than
+        once, when multiple ALSA events need to be created for the byte
+        sequence provided.
+
+        :param event: the event
+        :param queue: the queue to force the event to. Default: send directly, unless
+                      :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in the `event`.
+        :param dest: the destination. Default: all subscribers, unless :data:`event.dest` says
+                     otherwise.
+        :param remainder: remainder returned by the previous call to :meth:`_prepare_event` for the
+                          same event.
+
+        :return: :alsa:`snd_seq_event_t` object prepared and, if there are more
+        ALSA events to be created from the `event`, the `reminder` value to be
+        used in the next call to :meth:`_prepare_event`.
+        """
         if not isinstance(event, MidiBytesEvent):
             alsa_event: _snd_seq_event_t = ffi.new("snd_seq_event_t *")
             event._to_alsa(alsa_event, queue=queue, port=port, dest=dest)
@@ -339,6 +445,23 @@ class SequencerClientBase:
                      queue: Union['Queue', int] = None,
                      port: Union['Port', int] = None,
                      dest: AddressType = None) -> int:
+        """Output an event.
+
+        The event will be appended to the output buffer and sent only when the
+        buffer is full. Use :meth:`drain_output` to force sending of the events buffered.
+
+        May raise an :class:`ALSAError` when both the client-side and the kernel-side buffers are
+        full.
+
+        :param event: the event to be sent
+        :param queue: the queue to force the event to. Default: send directly, unless
+                      :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in the `event`.
+        :param dest: the destination. Default: all subscribers, unless :data:`event.dest` says
+                     otherwise.
+
+        :return: Number of bytes used in the output buffer.
+        """
         self._check_handle()
         remainder = None
         while True:
@@ -358,7 +481,14 @@ class SequencerClientBase:
         The event won't be sent, it will just be appended to the output buffer.
 
         The method never blocks, but may raise :exc:`ALSAError` with
-        :attr:`ALSAError.errnum` = - :data:`errno.EAGAIN` when the buffer is full.
+        `errnum`\xa0=\xa0-\xa0:data:`errno.EAGAIN` when the buffer is full.
+
+        :param event: the event to be sent
+        :param queue: the queue to force the event to. Default: send directly, unless
+                      :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in the `event`.
+        :param dest: the destination. Default: all subscribers, unless :data:`event.dest` says
+                     otherwise.
 
         :return: Number of bytes used in the output buffer.
         """
@@ -395,6 +525,21 @@ class SequencerClientBase:
                             queue: Union['Queue', int] = None,
                             port: Union['Port', int] = None,
                             dest: AddressType = None) -> int:
+        """Output an event directly to the sequencer.
+
+        The event will be sent directly to the kernel and not stored in the local buffer.
+
+        May raise an :class:`ALSAError` when the kernel-side buffers are full.
+
+        :param event: the event to be sent
+        :param queue: the queue to force the event to. Default: send directly, unless
+                      :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in the `event`.
+        :param dest: the destination. Default: all subscribers, unless :data:`event.dest` says
+                     otherwise.
+
+        :return: Number of bytes used in the output buffer.
+        """
         self._check_handle()
         remainder = None
         while True:
@@ -659,12 +804,13 @@ class SequencerClient(SequencerClientBase):
     synchronous (blocking) event I/O.
 
     :param client_name: client name for the connection
+    :param kwargs: arguments for the `SequencerClientBase` constructor
     """
 
-    def __init__(self, client_name: str, *args, **kwargs):
+    def __init__(self, client_name: str, **kwargs):
         if "mode" in kwargs and not kwargs["mode"] & OpenMode.NONBLOCK:
             raise ValueError("NONBLOCK open mode must be used")
-        super().__init__(client_name, *args, **kwargs)
+        super().__init__(client_name, **kwargs)
         self._read_poll = select.poll()
         self._read_poll.register(self._fd, select.POLLIN)
         self._write_poll = select.poll()
@@ -757,6 +903,13 @@ class SequencerClient(SequencerClientBase):
 
         May block when both the client-side and the kernel-side buffers are full.
 
+        :param event: the event to be sent
+        :param queue: the queue to force the event to. Default: send directly, unless
+                      :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in the `event`.
+        :param dest: the destination. Default: all subscribers, unless :data:`event.dest` says
+                     otherwise.
+
         :return: Number of bytes used in the output buffer.
         """
         self._check_handle()
@@ -773,6 +926,13 @@ class SequencerClient(SequencerClientBase):
         The event will be sent immediately. The function may block when the
         kernel-side buffer is full.
 
+        :param event: the event to be sent
+        :param queue: the queue to force the event to. Default: send directly,
+                      unless :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in the `event`.
+        :param dest: the destination. Default: all subscribers, unless :data:`event.dest` says
+                     otherwise.
+
         :return: Number of bytes sent to the sequencer.
         """
         self._check_handle()
@@ -781,16 +941,41 @@ class SequencerClient(SequencerClientBase):
 
 
 class AsyncSequencerClient(SequencerClientBase):
+    """ALSA sequencer client connection (async API).
+
+    This is the other main interface to interact with the sequencer. Provides
+    asynchronous (asyncio) event I/O.
+
+    Mostly the same as :class:`SequencerClient`, but a few methods are
+    coroutines here.
+
+    :param client_name: client name for the connection
+    :param kwargs: arguments for the `SequencerClientBase` constructor
+    """
+
     def __init__(self, *args, **kwargs):
         if "mode" in kwargs and not kwargs["mode"] & OpenMode.NONBLOCK:
             raise ValueError("NONBLOCK open mode must be used")
         super().__init__(*args, **kwargs)
 
     async def aclose(self):
+        """Close the client connection and release any associated resources.
+
+        The SequencerClient object won't be usable any more.
+
+        Currently the same as :meth:`close`.
+        """
         self.close()
 
-    async def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None):
+    async def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None
+                          ) -> Optional[Event]:
+        """Wait for and receive an incoming event.
 
+        :param prefer_bytes: set to `True` to return :class:`MidiBytesEvent` when possible.
+        :param timeout: maximum time (in seconds) to wait for an event. Default: wait forever.
+
+        :return: The event received or `None` if the timeout has been reached.
+        """
         result, event = self._event_input(prefer_bytes=prefer_bytes)
         if result != -errno.EAGAIN:
             _check_alsa_error(result)
@@ -869,32 +1054,70 @@ class AsyncSequencerClient(SequencerClientBase):
         _check_alsa_error(result)
         return result
 
-    def drain_output(self) -> Awaitable[int]:
+    async def drain_output(self) -> int:
+        """Send events in the output queue to the sequencer.
+
+        May block when the kernel-side buffer is full.
+
+        :return: Number of bytes remaining in the buffer.
+        """
+
         self._check_handle()
 
         def func(remainder=None):
             _ = remainder
             return alsa.snd_seq_drain_output(self.handle), None
 
-        return self._event_output_wait(func)
+        return await self._event_output_wait(func)
 
-    def event_output(self,
-                     event: Event,
-                     queue: Union['Queue', int] = None,
-                     port: Union['Port', int] = None,
-                     dest: AddressType = None) -> Awaitable[int]:
+    async def event_output(self,
+                           event: Event,
+                           queue: Union['Queue', int] = None,
+                           port: Union['Port', int] = None,
+                           dest: AddressType = None) -> int:
+        """Output an event.
+
+        The event will be appended to the output buffer and sent only when the
+        buffer is full. Use :meth:`drain_output` to force sending of the events buffered.
+
+        May block when both the client-side and the kernel-side buffers are full.
+
+        :param event: the event to be sent
+        :param queue: the queue to force the event to. Default: send directly,
+                      unless :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in the `event`.
+        :param dest: the destination. Default: all subscribers, unless
+                     :data:`event.dest` says otherwise.
+
+        :return: Number of bytes used in the output buffer.
+        """
         self._check_handle()
         func = partial(self._event_output, event, queue, port, dest)
-        return self._event_output_wait(func)
+        return await self._event_output_wait(func)
 
-    def event_output_direct(self,
-                            event: Event,
-                            queue: Union['Queue', int] = None,
-                            port: Union['Port', int] = None,
-                            dest: AddressType = None) -> Awaitable[int]:
+    async def event_output_direct(self,
+                                  event: Event,
+                                  queue: Union['Queue', int] = None,
+                                  port: Union['Port', int] = None,
+                                  dest: AddressType = None) -> int:
+        """Output an event without buffering.
+
+        The event will be sent immediately. The function may block when the
+        kernel-side buffer is full.
+
+        :param event: the event to be sent
+        :param queue: the queue to force the event to. Default: send directly,
+                      unless :data:`event.queue` is set.
+        :param port: the port to send the event from. Default: the one set in
+                     the `event`.
+        :param dest: the destination. Default: all subscribers, unless
+                     :data:`event.dest` says otherwise.
+
+        :return: Number of bytes sent to the sequencer.
+        """
         self._check_handle()
         func = partial(self._event_output_direct, event, queue, port, dest)
-        return self._event_output_wait(func)
+        return await self._event_output_wait(func)
 
 
 __all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType"]
