@@ -20,6 +20,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'sphinxcontrib.doxylink',
 ]
 
 templates_path = ['_templates']
@@ -41,3 +42,7 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 intersphinx_mapping = {'https://docs.python.org/': None}
+
+doxylink = {
+        'alsa': ('alsa.tag', 'https://www.alsa-project.org/alsa-doc/alsa-lib/'),
+}
