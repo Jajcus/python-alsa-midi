@@ -26,7 +26,7 @@ Features
 Installation
 ------------
 
-Usuallly the package would be installed with pip::
+Usually the package would be installed with pip::
 
   python3 -m pip install python-alsa-midi
 
