@@ -92,7 +92,9 @@ jobs:
 
   build:
 
-    needs: test
+    needs:
+      - test
+      - test-on-alsa-kernel
 
     runs-on: ubuntu-latest
 
@@ -119,3 +121,9 @@ jobs:
     - name: Build
       run: |
         python -m build .
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: dist-${{ matrix.python-version }}
+        path: dist
