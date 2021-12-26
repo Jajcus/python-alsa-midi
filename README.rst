@@ -7,39 +7,60 @@ Features
 --------
 
 * Pythonic API to most of the ALSA sequencer functionality
+
+* Access to ALSA sequencer features not available when using other ('portable')
+  Python MIDI libraries:
+
+  * Precise timestamping of messages sent and received
+  * Port connection management, including connection between ports on different
+    clients
+  * Access to non-MIDI events, like announcements about new clients, ports and
+    connections
+
 * Python 3.7 – 3.10 compatibility
+
 * Both synchronous (blocking) and asynchronous (asyncio) I/O
+
 * Only Python code, no need to compile a binary module. Requires `cffi`_, though.
+
+Installation
+------------
+
+Usuallly the package would be installed with pip::
+
+  python3 -m pip install python-alsa-midi
+
+That may trigger building of the binary module with the cffi bindings, that may
+fail if a compiler or ALSA headers are not available. This might be prevented
+by setting the ``PY_ALSA_MIDI_NO_COMPILE`` environment variable::
+
+  PY_ALSA_MIDI_NO_COMPILE=1 python3 -m pip install --no-binary :all: python-alsa-midi
+
+Alternatively one can just add the source directory (as checked out from
+https://github.com/Jajcus/python-alsa-midi.git) to `$PYTHONPATH` and use the
+packages directly, with no compilation.
 
 Usage
 -----
 
-.. currentmodule:: alsa_midi
+Detailed documentation is available at https://python-alsa-midi.readthedocs.io/
 
-To interface ALSA sequencer a client needs to be created. This is done by
-creating a :class:`SequencerClient` object::
+Simple example::
 
-  from alsa_midi import SequencerClient
+  import time
+  from alsa_midi import SequencerClient, READ_PORT, NoteOnEvent, NoteOffEvent
 
   client = SequencerClient("my client")
+  port = client.create_port("output", caps=READ_PORT)
+  dest_port = client.list_ports(output=True)[0]
+  port.connect_to(dest_port)
+  event1 = NoteOnEvent(note=60, velocity=64, channel=0)
+  client.event_output(event1)
+  client.drain_output()
+  time.sleep(1)
+  event2 = NoteOffEvent(note=60, channel=0)
+  client.event_output(event2)
+  client.drain_output()
 
-To receive or send MIDI events at least one port will be needed too::
-
-  port = client.create_port("inout")
-
-By default a generic bi-directional MIDI port with full subscription access is
-created.  Additional arguments :meth:`SequencerClient.create_port()`
-method can be used to change that::
-
-  from alsa_midi import WRITE_PORT, PortType
-
-  input_port = client.create_port("input",
-                                  caps=WRITE_PORT,
-                                  type=PortType.MIDI_GENERIC | PortType.MIDI_GM | PortType.SYNTHESIZER)
-
-Note: use :data:`WRITE_PORT` (or :attr:`PortCaps.WRITE`) for creating input
-ports (ports other clients can write to) and :data:`READ_PORT` (or
-:attr:`PortCaps.READ`) for creating output ports (that other clients can read
-from).
 
 .. _cffi: http://cffi.readthedocs.org/

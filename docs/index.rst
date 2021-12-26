@@ -11,6 +11,7 @@ Welcome to python-alsa-midi's documentation!
    :caption: Contents:
 
    README <overview>
+   usage
    api
 
 
