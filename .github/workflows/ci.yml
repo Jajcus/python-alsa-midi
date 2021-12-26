@@ -126,7 +126,7 @@ jobs:
         path: dist
 
 
-  pubish:
+  publish:
 
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
 
