@@ -4,7 +4,7 @@ from pure Python (API level)
 """
 
 try:
-    from ._ffi_bin import ffi
+    from ._ffi_bin import ffi  # type: ignore
     alsa = ffi.dlopen(None)
 except ImportError:
     from ._ffi_defs import ffi
