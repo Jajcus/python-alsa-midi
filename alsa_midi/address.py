@@ -14,6 +14,30 @@ AddressType = Union['Address', 'Port', 'PortInfo', Tuple[int, int]]
 
 
 class Address(namedtuple("Address", "client_id port_id")):
+    """ALSA sequencer port address (immutable).
+
+    Usage:
+
+    >>> addr = Address(128, 1)
+    >>> addr
+    Address(client_id=128, port_id=1)
+    >>> print(f"addres: {addr} client id: {addr.client_id} port id: {addr.port_id}")
+    addres: 128:1 client id: 128 port id: 1
+    >>> Address(128, 1)
+    Address(client_id=128, port_id=1)
+    >>> Address("128:1")
+    Address(client_id=128, port_id=1)
+    >>> addr = Address((128, 1))
+    Address(client_id=128, port_id=1)
+    >>> addr = Address(client, 1)
+    >>> addr = Address(port)
+
+    :param arg1: address or client_id
+    :param arg2: port id
+
+    :ivar client_id: client id
+    :ivar port_id: port id
+    """
     __slots__ = ()
 
     @overload

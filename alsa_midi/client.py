@@ -134,6 +134,9 @@ class ClientInfo:
 
 class SequencerClientBase:
     """Base class for :class:`SequencerClient` and :class:`AsyncSequencerClient`.
+
+    Constructor wraps :alsa:`snd_seq_open`.
+
     :param client_name: Client name
     :param streams: client streams open type
     :param mode: open mode (should be: :attr:`OpenMode.NONBLOCK`)
@@ -179,6 +182,8 @@ class SequencerClientBase:
         """Close the client connection and release any associated resources.
 
         The SequencerClient object won't be usable any more.
+
+        Wraps :alsa:`snd_seq_close`.
         """
         if self._handle_p is None:
             return
@@ -367,6 +372,9 @@ class SequencerClientBase:
         When no event is available :class:`ALSAError` will be raised with `errnum` set to
         -\xa0:data:`errno.EAGAIN`.
 
+        Wraps :alsa:`snd_seq_event_input` and :alsa:`snd_midi_event_decode` when `prefer_bytes` is
+        `True`.
+
         :param prefer_bytes: set to `True` to return :class:`MidiBytesEvent` when possible.
         :param timeout: maximum time (in seconds) to wait for an event. Default: wait forever.
 
@@ -453,6 +461,8 @@ class SequencerClientBase:
         May raise an :class:`ALSAError` when both the client-side and the kernel-side buffers are
         full.
 
+        Wraps :alsa:`snd_seq_event_output`.
+
         :param event: the event to be sent
         :param queue: the queue to force the event to. Default: send directly, unless
                       :data:`event.queue` is set.
@@ -482,6 +492,8 @@ class SequencerClientBase:
 
         The method never blocks, but may raise :exc:`ALSAError` with
         `errnum`\xa0=\xa0-\xa0:data:`errno.EAGAIN` when the buffer is full.
+
+        Wraps :alsa:`snd_seq_event_output_buffer`.
 
         :param event: the event to be sent
         :param queue: the queue to force the event to. Default: send directly, unless
@@ -531,6 +543,8 @@ class SequencerClientBase:
 
         May raise an :class:`ALSAError` when the kernel-side buffers are full.
 
+        Wraps :alsa:`snd_seq_event_output_direct`.
+
         :param event: the event to be sent
         :param queue: the queue to force the event to. Default: send directly, unless
                       :data:`event.queue` is set.
@@ -560,6 +574,14 @@ class SequencerClientBase:
 
     def query_next_client(self, previous: Optional[Union[ClientInfo, int]] = None
                           ) -> Optional[ClientInfo]:
+        """Obtain information about the first or the next sequencer client.
+
+        Wraps :alsa:`snd_seq_query_next_client`.
+
+        :param previous: previous client id or info object, `None` to query the first one
+
+        :return: client information of `None` if there are no more clients
+        """
         self._check_handle()
         if isinstance(previous, ClientInfo):
             info = previous._to_alsa()
@@ -577,6 +599,12 @@ class SequencerClientBase:
         return result
 
     def get_port_info(self, port: Union[int, AddressType]) -> PortInfo:
+        """Obtain information about a specific port.
+
+        Wraps :alsa:`snd_seq_get_port_info` or :alsa:`snd_seq_get_any_port_info`.
+
+        :return: port information
+        """
         if isinstance(port, int):
             client_id = self.client_id
             port_id = port
@@ -595,6 +623,12 @@ class SequencerClientBase:
         return result
 
     def set_port_info(self, port: Union[int, Port], info: PortInfo):
+        """Set information about a specific own port.
+
+        Wraps :alsa:`snd_seq_set_port_info`.
+
+        :return: port information
+        """
         if isinstance(port, int):
             port_id = port
         else:
@@ -617,6 +651,16 @@ class SequencerClientBase:
                         client_id: int,
                         previous: Optional[Union[PortInfo, int]] = None
                         ) -> Optional[PortInfo]:
+        """Obtain information about the first or the next port of a sequencer client.
+
+        Wraps :alsa:`snd_seq_query_next_port`.
+
+        :param client_id: client id
+        :param previous: previous client id or info object, `None` to query the first one
+
+        :return: client information of `None` if there are no more ports
+        """
+
         self._check_handle()
         if isinstance(previous, PortInfo):
             if not previous.client_id == client_id:
@@ -646,6 +690,29 @@ class SequencerClientBase:
                    only_connectable: bool = True,
                    sort: Union[bool, Callable[[PortInfo], Any]] = True,
                    ) -> List[PortInfo]:
+        """More friendly interface to list available ports.
+
+        Queries ALSA for all clients and ports and returns those matching the selected criteria.
+
+        The result is sorted in a way that the first returned entry should be the 'most usable'
+        one for the selected purpose. E.g. when `output` = `True` then the first entry will be
+        a synthesizer input port rather than the dummy 'Midi Through' port. This is still a guess,
+        though, so in the end the user should be able to choose.
+
+        Wraps :alsa:`snd_seq_query_next_client` and :alsa:`snd_seq_query_next_port`.
+
+        :param input: return ports usable for event input (`PortCaps.READ`)
+        :param output: return ports usable for event output (`PortCaps.WRITE`)
+        :param type: limit ouput to ports of this type
+        :param include_system: include system ports
+        :param include_midi_through: include 'midi through' ports
+        :param include_no_export: include 'no export' ports
+        :param only_connectable: only list ports that can be connected to/from
+        :param sort: output sorting. `True` to for default algorithm, `False` to disable sorting
+                     (return in ALSA identifiers order) or callable for custom sort key.
+
+        :return: list of port information
+        """
 
         result = []
         self._check_handle()
@@ -775,6 +842,17 @@ class SequencerClientBase:
                        exclusive: bool = False,
                        time_update: bool = False,
                        time_real: bool = False):
+        """Connect two ALSA ports.
+
+        Wraps :alsa:`snd_seq_subscribe_port`.
+
+        :param sender: source port address
+        :param dest: destination port adddress
+        :param exclusive: set up an exclusive connection
+        :param queue: queue to use for time stamping
+        :param time_update: enable time stamp updates
+        :param time_real: use real time instead of MIDI ticks for time stamps
+        """
         self._check_handle()
         return self._subunsub_port(alsa.snd_seq_subscribe_port,
                                    sender, dest,
@@ -783,18 +861,17 @@ class SequencerClientBase:
                                    time_update=time_update,
                                    time_real=time_real)
 
-    def unsubscribe_port(self, sender: AddressType, dest: AddressType, *,
-                         queue: Optional[Union[Queue, int]] = None,
-                         exclusive: bool = False,
-                         time_update: bool = False,
-                         time_real: bool = False):
+    def unsubscribe_port(self, sender: AddressType, dest: AddressType):
+        """Disconnect two ALSA ports.
+
+        Wraps :alsa:`snd_seq_unsubscribe_port`.
+
+        :param sender: source port address
+        :param dest: destination port adddress
+        """
         self._check_handle()
         return self._subunsub_port(alsa.snd_seq_unsubscribe_port,
-                                   sender, dest,
-                                   queue=queue,
-                                   exclusive=exclusive,
-                                   time_update=time_update,
-                                   time_real=time_real)
+                                   sender, dest)
 
 
 class SequencerClient(SequencerClientBase):
@@ -819,6 +896,9 @@ class SequencerClient(SequencerClientBase):
     def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None
                     ) -> Optional[Event]:
         """Wait for and receive an incoming event.
+
+        Wraps :alsa:`snd_seq_event_input` and :alsa:`snd_midi_event_decode` when `prefer_bytes` is
+        `True`.
 
         :param prefer_bytes: set to `True` to return :class:`MidiBytesEvent` when possible.
         :param timeout: maximum time (in seconds) to wait for an event. Default: wait forever.
@@ -880,6 +960,8 @@ class SequencerClient(SequencerClientBase):
 
         May block when the kernel-side buffer is full.
 
+        Wraps :alsa:`snd_seq_drain_output`.
+
         :return: Number of bytes remaining in the buffer.
         """
 
@@ -903,6 +985,8 @@ class SequencerClient(SequencerClientBase):
 
         May block when both the client-side and the kernel-side buffers are full.
 
+        Wraps :alsa:`snd_seq_event_output`.
+
         :param event: the event to be sent
         :param queue: the queue to force the event to. Default: send directly, unless
                       :data:`event.queue` is set.
@@ -925,6 +1009,8 @@ class SequencerClient(SequencerClientBase):
 
         The event will be sent immediately. The function may block when the
         kernel-side buffer is full.
+
+        Wraps :alsa:`snd_seq_event_output_direct`.
 
         :param event: the event to be sent
         :param queue: the queue to force the event to. Default: send directly,
@@ -970,6 +1056,9 @@ class AsyncSequencerClient(SequencerClientBase):
     async def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None
                           ) -> Optional[Event]:
         """Wait for and receive an incoming event.
+
+        Wraps :alsa:`snd_seq_event_input` and alsa:`snd_midi_event_decode` when `prefer_bytes` is
+        `True`.
 
         :param prefer_bytes: set to `True` to return :class:`MidiBytesEvent` when possible.
         :param timeout: maximum time (in seconds) to wait for an event. Default: wait forever.
@@ -1059,6 +1148,8 @@ class AsyncSequencerClient(SequencerClientBase):
 
         May block when the kernel-side buffer is full.
 
+        Wraps :alsa:`snd_seq_drain_output`.
+
         :return: Number of bytes remaining in the buffer.
         """
 
@@ -1082,6 +1173,8 @@ class AsyncSequencerClient(SequencerClientBase):
 
         May block when both the client-side and the kernel-side buffers are full.
 
+        Wraps :alsa:`snd_seq_event_output`.
+
         :param event: the event to be sent
         :param queue: the queue to force the event to. Default: send directly,
                       unless :data:`event.queue` is set.
@@ -1104,6 +1197,8 @@ class AsyncSequencerClient(SequencerClientBase):
 
         The event will be sent immediately. The function may block when the
         kernel-side buffer is full.
+
+        Wraps :alsa:`snd_seq_event_output_direct`.
 
         :param event: the event to be sent
         :param queue: the queue to force the event to. Default: send directly,
