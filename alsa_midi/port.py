@@ -1,6 +1,6 @@
 
 from enum import IntFlag
-from typing import TYPE_CHECKING, List, NewType, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, NewType, Optional
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -66,7 +66,14 @@ DEFAULT_PORT_TYPE = PortType.MIDI_GENERIC | PortType.SOFTWARE
 
 
 class Port:
-    """Sequencer port."""
+    """Sequencer port.
+
+    :ivar client: the client object this port belongs to
+    :ivar client_id: client identifier
+    :ivar port_id: port identifier
+    """
+
+    client: Optional['SequencerClientBase']
     client_id: int
     port_id: int
 
@@ -90,6 +97,9 @@ class Port:
         return handle
 
     def close(self):
+        """Close the port, freeing any resources.
+
+        Wraps :alsa:`snd_seq_delete_simple_port`."""
         if self.client is None:
             return
         handle = self.client.handle
@@ -100,35 +110,67 @@ class Port:
             _check_alsa_error(err)
 
     def connect_to(self, dest: AddressType):
+        """Connect port to another one.
+
+        :param dest: destination port
+
+        Wraps :alsa:`snd_seq_connect_to`.
+        """
         client_id, port_id = Address(dest)
         handle = self._get_client_handle()
         err = alsa.snd_seq_connect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def disconnect_to(self, dest: AddressType):
+        """Disconnect port from another one.
+
+        :param dest: destination port
+
+        Wraps :alsa:`snd_seq_disconnect_to`.
+        """
         client_id, port_id = Address(dest)
         handle = self._get_client_handle()
         err = alsa.snd_seq_disconnect_to(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def connect_from(self, src: AddressType):
+        """Connect another port to this one.
+
+        :param src: source port
+
+        Wraps :alsa:`snd_seq_connect_from`.
+        """
         client_id, port_id = Address(src)
         handle = self._get_client_handle()
         err = alsa.snd_seq_connect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
     def disconnect_from(self, src: AddressType):
+        """Disconnect another port from this one.
+
+        :param src: source port
+
+        Wraps :alsa:`snd_seq_disconnect_from`.
+        """
         client_id, port_id = Address(src)
         handle = self._get_client_handle()
         err = alsa.snd_seq_disconnect_from(handle, self.port_id, client_id, port_id)
         _check_alsa_error(err)
 
-    def get_info(self):
+    def get_info(self) -> 'PortInfo':
+        """Get information about the port.
+
+        Wraps :alsa:`snd_seq_get_port_info`.
+        """
         if self.client is None:
             raise StateError("Already closed")
         return self.client.get_port_info(self)
 
     def set_info(self, info: 'PortInfo'):
+        """Update information about the port.
+
+        Wraps :alsa:`snd_seq_set_port_info`.
+        """
         if self.client is None:
             raise StateError("Already closed")
         return self.client.set_port_info(self, info)
@@ -138,6 +180,30 @@ _snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)
 
 
 class PortInfo:
+    """Sequencer port information.
+
+    :ivar client_id: client identifier
+    :ivar port_id: port identifier
+    :ivar name: port name
+    :ivar capability: port capabilities
+    :ivar type: port type
+    :ivar midi_channels: number of MIDI channels
+    :ivar midi_voices: number of MIDI voices
+    :ivar synth_voices: number of synth voices
+    :ivar read_use: number of readers
+    :ivar write_use: number of writers
+    :ivar port_specified: `True` when port is specified in the structure
+    :ivar timestamping: enable time stamping
+    :ivar timestamp_real: use real time (not MIDI ticks) for time stamping
+    :ivar timestamp_queue_id: queue used for timestamping
+    :ivar client_name: client name. Set only when :meth:`~alsa_midi.SequencerClient.list_ports()`
+                       was used to obtain this information.
+
+    Represents :alsa:`snd_seq_port_info_t` with extra optional
+    :attr:`client_name` attribute added when created by
+    :meth:`~alsa_midi.SequencerClient.list_ports()`.
+    """
+
     client_id: int
     port_id: int
     name: str
@@ -239,7 +305,10 @@ class PortInfo:
         return info
 
 
-def get_port_info_sort_key(preferred_types: List[PortType] = []):
+def get_port_info_sort_key(preferred_types: List[PortType] = []
+                           ) -> Callable[[PortInfo], Any]:
+    """Return a :class:`PortInfo` sorting key function for given type
+    preference."""
     def key(info: PortInfo):
         is_midi_through = info.client_name == "Midi Through"
         preference = len(preferred_types)

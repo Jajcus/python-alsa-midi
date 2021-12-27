@@ -8,6 +8,7 @@ API Reference
    api_client
    api_async_client
    api_port
+   api_queue
    api_exceptions
    api_misc
 
