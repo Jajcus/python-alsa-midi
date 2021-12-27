@@ -28,13 +28,13 @@ Installation
 
 Usually the package would be installed with pip::
 
-  python3 -m pip install python-alsa-midi
+  python3 -m pip install alsa-midi
 
 That may trigger building of the binary module with the cffi bindings, that may
 fail if a compiler or ALSA headers are not available. This might be prevented
 by setting the ``PY_ALSA_MIDI_NO_COMPILE`` environment variable::
 
-  PY_ALSA_MIDI_NO_COMPILE=1 python3 -m pip install --no-binary :all: python-alsa-midi
+  PY_ALSA_MIDI_NO_COMPILE=1 python3 -m pip install --no-binary :all: alsa-midi
 
 Alternatively one can just add the source directory (as checked out from
 https://github.com/Jajcus/python-alsa-midi.git) to `$PYTHONPATH` and use the
