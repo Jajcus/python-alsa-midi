@@ -19,6 +19,8 @@ if [ -f /etc/redhat-release ] ; then
 	# CenOS image
 	yum install -y alsa-lib-devel libffi-devel
 else
+	ID=""
+	ID_LIKE=""
 	. /etc/os-release
 
 	if [ "$ID" = "debian" -o "$ID_LIKE" = "debian" ] ; then
@@ -31,7 +33,9 @@ else
 fi
 
 # Compile wheels
-for PYBIN in /opt/python/cp{37,38,39}*/bin; do
+for PYBIN in /opt/python/cp{37,38,39,310}*/bin; do
+    [ -d "$PYBIN" ] || continue
+    "${PYBIN}/pip" install --upgrade pip setuptools
     "${PYBIN}/pip" install -r /io/requirements.txt
     "${PYBIN}/pip" wheel /io/ --no-deps -w wheelhouse/
 done
@@ -43,8 +47,10 @@ done
 
 # Install packages and test
 cd /
-for PYBIN in /opt/python/cp{37,38,39}*/bin/; do
+for PYBIN in /opt/python/cp{37,38,39,310}*/bin/; do
+    [ -d "$PYBIN" ] || continue
+
     "${PYBIN}/pip" install pytest pytest-asyncio
-    "${PYBIN}/pip" install python-alsa-midi --no-index -f /io/wheelhouse
+    "${PYBIN}/pip" install alsa-midi --no-index -f /io/wheelhouse/
     "${PYBIN}/python" -m pytest -vv /io/tests
 done
