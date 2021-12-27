@@ -131,9 +131,9 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        manylinux-tag: ["manylinux2010_x86_64", "manylinux2014_x86_64", "manylinux_2_24_x86_64", "manylinux2010_i686", "manylinux2014_i686", "manylinux_2_24_686"]
+        manylinux-tag: ["manylinux2010_x86_64", "manylinux2014_x86_64", "manylinux_2_24_x86_64", "manylinux2010_i686", "manylinux2014_i686", "manylinux_2_24_i686"]
         include:
           - manylinux-tag: manylinux2010_i686
             pre-cmd: linux32
@@ -151,7 +151,7 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Build ${{ matrix.manylinux-tag }} wheels
+    - name: Build and test ${{ matrix.manylinux-tag }} wheels
       run: |
         ./build-wheels.sh ${{ matrix.pre-cmd }} ${{ matrix.manylinux-tag }}
 
