@@ -9,3 +9,4 @@ __pycache__
 /tests/alsa_midi
 /examples/alsa_midi
 /docs/_build
+/wheelhouse
