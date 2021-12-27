@@ -141,6 +141,9 @@ jobs:
             pre-cmd: linux32
           - manylinux-tag: manylinux_2_24_i686
             pre-cmd: linux32
+      
+    container:
+      image: docker://quay.io/pypa/${{ matrix.manylinux-tag }}
 
     steps:
     - name: Checkout the code
@@ -149,9 +152,8 @@ jobs:
         fetch-depth: 0
 
     - name: Build ${{ matrix.manylinux-tag }} wheels
-      uses: docker://quay.io/pypa/${{ matrix.manylinux-tag }}
-      with:
-        entrypoint: ./build-wheels.sh ${{ matrix.pre-cmd }} ${{ matrix.manylinux-tag }}
+      run: |
+        ./build-wheels.sh ${{ matrix.pre-cmd }} ${{ matrix.manylinux-tag }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
