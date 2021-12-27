@@ -3,3 +3,9 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2", "cffi"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
+
+[tool.pytest.ini_options]
+minversion = "6.2"
+testpaths = "tests"
+required_plugins = "pytest-asyncio"
+addopts = "--import-mode=append"
