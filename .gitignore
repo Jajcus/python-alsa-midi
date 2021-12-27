@@ -1,6 +1,7 @@
 __pycache__
 *.pyc
 *~
+*.egg-info
 /.tox
 /.vagrant
 /python_alsa_midi.egg-info
