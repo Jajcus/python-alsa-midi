@@ -8,6 +8,16 @@ ffi = FFI()
 
 C_SOURCE = """
 #include <alsa/asoundlib.h>
+#include <errno.h>
+
+#if SND_LIB_VERSION < 0x010101
+int snd_seq_client_info_get_card(const snd_seq_client_info_t *info) {
+    return -ENOSYS;
+}
+int snd_seq_client_info_get_pid(const snd_seq_client_info_t *info) {
+    return -ENOSYS;
+}
+#endif
 """
 
 C_DEFS_PACKED = r"""
@@ -24,7 +34,8 @@ C_DEFS = r"""
 
 const char *snd_asoundlib_version(void);
 
-void *snd_dlopen(const char *file, int mode, char *errbuf, size_t errbuflen);
+/* different in manylinux1 image
+   void *snd_dlopen(const char *file, int mode, char *errbuf, size_t errbuflen); */
 void *snd_dlsym(void *handle, const char *name, const char *version);
 int snd_dlclose(void *handle);
 
@@ -311,7 +322,7 @@ typedef struct _snd_timer_read {
 #define SND_TIMER_GLOBAL_SYSTEM 0
 #define SND_TIMER_GLOBAL_RTC    1   /* Obsoleted, due to enough legacy. */
 #define SND_TIMER_GLOBAL_HPET   2
-#define SND_TIMER_GLOBAL_HRTIMER 3
+/* not in manylinux1 image #define SND_TIMER_GLOBAL_HRTIMER 3 */
 
 #define SND_TIMER_OPEN_NONBLOCK     0
 #define SND_TIMER_OPEN_TREAD        2

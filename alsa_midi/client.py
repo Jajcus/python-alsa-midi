@@ -104,8 +104,18 @@ class ClientInfo:
         """Create a ClientInfo object from ALSA :alsa:`snd_seq_client_info_t`."""
         broadcast_filter = alsa.snd_seq_client_info_get_broadcast_filter(info)
         error_bounce = alsa.snd_seq_client_info_get_broadcast_filter(info)
-        card_id = alsa.snd_seq_client_info_get_card(info)
-        pid = alsa.snd_seq_client_info_get_pid(info)
+        try:
+            card_id = alsa.snd_seq_client_info_get_card(info)
+            if card_id < 0:
+                card_id = None
+        except AttributeError:
+            card_id = None
+        try:
+            pid = alsa.snd_seq_client_info_get_pid(info)
+            if pid < 0:
+                pid = None
+        except AttributeError:
+            pid = None
         name = ffi.string(alsa.snd_seq_client_info_get_name(info))
         return cls(
                 client_id=alsa.snd_seq_client_info_get_client(info),
@@ -113,8 +123,8 @@ class ClientInfo:
                 broadcast_filter=(broadcast_filter == 1),
                 error_bounce=error_bounce == 1,
                 type=ClientType(alsa.snd_seq_client_info_get_type(info)),
-                card_id=(card_id if card_id >= 0 else None),
-                pid=(pid if pid > 0 else None),
+                card_id=card_id,
+                pid=pid,
                 num_ports=alsa.snd_seq_client_info_get_num_ports(info),
                 event_lost=alsa.snd_seq_client_info_get_event_lost(info),
                 )
