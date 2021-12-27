@@ -134,13 +134,13 @@ jobs:
       fail-fast: true
       matrix:
         manylinux-tag: ["manylinux2010_x86_64", "manylinux2014_x86_64", "manylinux_2_24_x86_64", "manylinux2010_i686", "manylinux2014_i686", "manylinux_2_24_686"]
-      include:
-        - manylinux-tag: manylinux2010_i686
-          pre-cmd: linux32
-        - manylinux-tag: manylinux2014_i686
-          pre-cmd: linux32
-        - manylinux-tag: manylinux_2_24_i686
-          pre-cmd: linux32
+        include:
+          - manylinux-tag: manylinux2010_i686
+            pre-cmd: linux32
+          - manylinux-tag: manylinux2014_i686
+            pre-cmd: linux32
+          - manylinux-tag: manylinux_2_24_i686
+            pre-cmd: linux32
 
     steps:
     - name: Checkout the code
