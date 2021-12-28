@@ -13,6 +13,26 @@ function repair_wheel {
     fi
 }
 
+function rename_wheel {
+    # bundling libasound.so.2 won't work but the ABI should be stable enough
+    # to satisfy PEP600: "This tag is a promise: the wheel's creator promises
+    # that the wheel will work on any mainstream Linux distro that uses glibc
+    # version ${GLIBCMAJOR}.${GLIBCMINOR} or later"
+
+    wheel="$1"
+
+    filename="$(basename "$wheel")"
+    prefix="${filename%-linux_*.whl}"
+    if [ "$prefix" = "$wheel" ] ; then
+        echo "Skipping non-platform wheel $wheel"
+	return
+    fi
+    suffix="${filename##$prefix}"
+
+    cp "$wheel" wheelhouse/"${prefix}-$PLAT.whl"
+}
+
+
 
 # Install a system package required by our library
 if [ -f /etc/redhat-release ] ; then
@@ -40,9 +60,10 @@ for PYBIN in /opt/python/cp{37,38,39,310}*/bin; do
     "${PYBIN}/pip" wheel "$GITHUB_WORKSPACE" --no-deps -w wheelhouse/
 done
 
-# Bundle external shared libraries into the wheels
+# Was: Bundle external shared libraries into the wheels-
+# Now: change platform tag
 for whl in wheelhouse/*.whl; do
-    repair_wheel "$whl"
+    rename_wheel "$whl"
 done
 
 # remove 'bad' linux_* wheels
