@@ -490,4 +490,4 @@ async def asyncio_latency_check(event_loop):
     await task
 
     assert latency.max is not None
-    assert latency.max < 1, f"Measured latency >= 1, samples: {latency.samples!r}"
+    assert latency.max < 2, f"Measured latency >= 2, samples: {latency.samples!r}"

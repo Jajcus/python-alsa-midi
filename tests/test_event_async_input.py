@@ -22,7 +22,7 @@ async def test_event_input(asyncio_latency_check):
 
     # flush any 'port connect' events that could been emitted by some session
     # managers auto-connecting stuff
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(1)
     client.drop_input()
 
     # should fail with EAGAIN
@@ -31,9 +31,9 @@ async def test_event_input(asyncio_latency_check):
 
     # should block for 0.5s
     start = time.monotonic()
-    event = await client.event_input(timeout=0.5)
+    event = await client.event_input(timeout=2)
     assert event is None
-    assert time.monotonic() - start >= 0.5
+    assert time.monotonic() - start >= 2.0
 
     # play a midi file to our port
     await asyncio_latency_check.stop()
@@ -51,12 +51,12 @@ async def test_event_input(asyncio_latency_check):
 
     # should block for 0.5s (no more events)
     start = time.monotonic()
-    event = await client.event_input(timeout=0.5)
+    event = await client.event_input(timeout=2)
     assert event is None
-    assert time.monotonic() - start >= 0.5
+    assert time.monotonic() - start >= 2.0
 
     await asyncio_latency_check.stop()
     player.wait()
     await asyncio_latency_check.cont()
 
-    assert (await asyncio_latency_check.get_max()) < 0.4
+    assert (await asyncio_latency_check.get_max()) < 1
