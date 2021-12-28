@@ -298,8 +298,9 @@ jobs:
         run: |
           ls -lR .
           mkdir -p dist
-          mv wheelhouse-*/*/*manylinux*.whl dist/
-          mv dist-pure/*/*.tar.gz dist/
+          mv wheelhouse-*/*manylinux*.whl dist/
+          mv dist-pure/*-py3-none-any.whl dist/
+          mv dist-pure/*.tar.gz dist/
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
