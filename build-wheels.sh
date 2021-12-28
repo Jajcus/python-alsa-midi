@@ -45,6 +45,9 @@ for whl in wheelhouse/*.whl; do
     repair_wheel "$whl"
 done
 
+# remove 'bad' linux_* wheels
+rm wheelhouse/*-linux_*.whl
+
 # Install packages and test
 cd /
 for PYBIN in /opt/python/cp{37,38,39,310}*/bin/; do

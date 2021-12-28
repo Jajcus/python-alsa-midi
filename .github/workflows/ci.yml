@@ -123,7 +123,6 @@ jobs:
         path: dist
 
   # separate jobs, as matrix does not work with 'uses: docker://' and 'container:' does not work well with 'actions/checkout'
-  # "manylinux2010_x86_64", "manylinux2014_x86_64", "manylinux_2_24_x86_64", "manylinux2010_i686", "manylinux2014_i686", "manylinux_2_24_i686"
 
   build-manylinux2010_x86_64:
 
@@ -173,6 +172,106 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: wheelhouse-manylinux2010_i686
+        path: wheelhouse
+
+  build-manylinux2014_x86_64:
+
+    needs:
+      - test
+      - test-on-alsa-kernel
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Build and test ${{ matrix.manylinux-tag }} wheels
+      uses: docker://quay.io/pypa/manylinux2014_x86_64
+      with:
+        args: ./build-wheels.sh manylinux2014_x86_64
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: wheelhouse-manylinux2014_x86_64
+        path: wheelhouse
+
+  build-manylinux2014_i686:
+
+    needs:
+      - test
+      - test-on-alsa-kernel
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Build and test ${{ matrix.manylinux-tag }} wheels
+      uses: docker://quay.io/pypa/manylinux2014_i686
+      with:
+        args: linux32 ./build-wheels.sh manylinux2014_i686
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: wheelhouse-manylinux2014_i686
+        path: wheelhouse
+
+  build-manylinux_2_24_x86_64:
+
+    needs:
+      - test
+      - test-on-alsa-kernel
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Build and test ${{ matrix.manylinux-tag }} wheels
+      uses: docker://quay.io/pypa/manylinux_2_24_x86_64
+      with:
+        args: ./build-wheels.sh manylinux_2_24_x86_64
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: wheelhouse-manylinux_2_24_x86_64
+        path: wheelhouse
+
+  build-manylinux_2_24_i686:
+
+    needs:
+      - test
+      - test-on-alsa-kernel
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Build and test ${{ matrix.manylinux-tag }} wheels
+      uses: docker://quay.io/pypa/manylinux_2_24_i686
+      with:
+        args: linux32 ./build-wheels.sh manylinux_2_24_i686
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: wheelhouse-manylinux_2_24_i686
         path: wheelhouse
 
 
