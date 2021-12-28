@@ -283,6 +283,10 @@ jobs:
       - build-pure
       - build-manylinux2010_x86_64
       - build-manylinux2010_i686
+      - build-manylinux2014_x86_64
+      - build-manylinux2014_i686
+      - build-manylinux_2_24_x86_64
+      - build-manylinux_2_24_i686
 
     runs-on: ubuntu-latest
 
