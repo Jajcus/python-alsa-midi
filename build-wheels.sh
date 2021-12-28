@@ -9,7 +9,7 @@ function repair_wheel {
     if ! auditwheel show "$wheel"; then
         echo "Skipping non-platform wheel $wheel"
     else
-        auditwheel repair "$wheel" --plat "$PLAT" -w /io/wheelhouse/
+        auditwheel repair "$wheel" --plat "$PLAT" -w "$GITHUB_WORKSPACE/wheelhouse/"
     fi
 }
 
@@ -36,8 +36,8 @@ fi
 for PYBIN in /opt/python/cp{37,38,39,310}*/bin; do
     [ -d "$PYBIN" ] || continue
     "${PYBIN}/pip" install --upgrade pip setuptools
-    "${PYBIN}/pip" install -r /io/requirements.txt
-    "${PYBIN}/pip" wheel /io/ --no-deps -w wheelhouse/
+    "${PYBIN}/pip" install -r "$GITHUB_WORKSPACE/requirements.txt"
+    "${PYBIN}/pip" wheel "$GITHUB_WORKSPACE" --no-deps -w wheelhouse/
 done
 
 # Bundle external shared libraries into the wheels
@@ -51,6 +51,6 @@ for PYBIN in /opt/python/cp{37,38,39,310}*/bin/; do
     [ -d "$PYBIN" ] || continue
 
     "${PYBIN}/pip" install pytest pytest-asyncio
-    "${PYBIN}/pip" install alsa-midi --no-index -f /io/wheelhouse/
-    "${PYBIN}/python" -m pytest -vv /io/tests
+    "${PYBIN}/pip" install alsa-midi --no-index -f "$GITHUB_WORKSPACE/wheelhouse/"
+    "${PYBIN}/python" -m pytest -vv "$GITHUB_WORKSPACE/tests"
 done
