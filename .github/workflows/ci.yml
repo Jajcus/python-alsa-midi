@@ -141,8 +141,8 @@ jobs:
 
     - name: Build and test ${{ matrix.manylinux-tag }} wheels
       uses: docker://quay.io/pypa/manylinux2010_x86_x64
-      run: |
-        ./build-wheels.sh manylinux2010_x86_x64
+      with:
+        args: ./build-wheels.sh manylinux2010_x86_x64
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
@@ -166,8 +166,8 @@ jobs:
 
     - name: Build and test ${{ matrix.manylinux-tag }} wheels
       uses: docker://quay.io/pypa/manylinux2010_i686
-      run: |
-        linux32 ./build-wheels.sh manylinux2010_i686
+      with:
+        args: linux32 ./build-wheels.sh manylinux2010_i686
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
