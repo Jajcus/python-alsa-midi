@@ -166,12 +166,12 @@ jobs:
     - name: Build and test ${{ matrix.manylinux-tag }} wheels
       uses: docker://quay.io/pypa/manylinux2010_i686
       with:
-        args: linux32 ./build-wheels.sh manylinux2010_i686
+        args: linux32 ./build-wheels.sh manylinux_2_12_i686
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: wheelhouse-manylinux2010_i686
+        name: wheelhouse-manylinux_2_12_i686
         path: wheelhouse
 
   build-manylinux_2_17_x86_64:
