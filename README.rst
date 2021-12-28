@@ -26,15 +26,27 @@ Features
 Installation
 ------------
 
-Usually the package would be installed with pip::
+This package requires ALSA library to be installed (``libasound.so.2`` –
+'libasound2' package on Debian-like systems). On a typical Linux system it is
+probably already installed for some other audio or MIDI software.
+
+python-alsa-midi package may be installed with pip::
 
   python3 -m pip install alsa-midi
 
-That may trigger building of the binary module with the cffi bindings, that may
-fail if a compiler or ALSA headers are not available. This might be prevented
-by setting the ``PY_ALSA_MIDI_NO_COMPILE`` environment variable::
+This should normally install a binary wheel compiled on a compatible system or
+pure-python wheel working without compilation.
 
-  PY_ALSA_MIDI_NO_COMPILE=1 python3 -m pip install --no-binary :all: alsa-midi
+If no compatible wheel is found build from source package will be triggered,
+which will also require ALSA library development files (libasound2-dev).
+
+To force installing from source (and compiling the binary extension) use::
+
+  python3 -m pip install --no-binary=alsa-midi alsa-midi
+
+To force installing from source without compiling the extension::
+
+  PY_ALSA_MIDI_NO_COMPILE=1 python3 -m pip install --no-binary=alsa-midi alsa-midi
 
 Alternatively one can just add the source directory (as checked out from
 https://github.com/Jajcus/python-alsa-midi.git) to `$PYTHONPATH` and use the
