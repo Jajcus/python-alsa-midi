@@ -263,6 +263,13 @@ class PortInfo:
         self.timestamp_queue_id = timestamp_queue_id
         self.client_name = None
 
+    def __repr__(self):
+        if self.client_name is not None:
+            at_client_name = f" @ {self.client_name!r}"
+        else:
+            at_client_name = ""
+        return f"<PortInfo {self.client_id}:{self.port_id} {self.name!r}{at_client_name}>"
+
     @classmethod
     def _from_alsa(cls, info: _snd_seq_port_info_t):
         name = ffi.string(alsa.snd_seq_port_info_get_name(info))
