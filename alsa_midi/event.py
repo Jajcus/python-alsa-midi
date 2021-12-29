@@ -15,6 +15,16 @@ if TYPE_CHECKING:
 
 @total_ordering
 class RealTime:
+    """Event time in seconds and nanoseconds.
+
+    Used for precise timing of events.
+
+    :param seconds: time in seconds
+    :param nanoseconds: nanoseconds
+
+    :ivar seconds: number of seconds
+    :ivar nanoseconds: number of nanoseconds
+    """
     __slots__ = ('seconds', 'nanoseconds')
 
     seconds: int
@@ -66,6 +76,7 @@ class RealTime:
 
 
 class EventType(IntEnum):
+    """Event type values."""
     SYSTEM = alsa.SND_SEQ_EVENT_SYSTEM
     RESULT = alsa.SND_SEQ_EVENT_RESULT
     NOTE = alsa.SND_SEQ_EVENT_NOTE
@@ -160,6 +171,7 @@ MIDI_BYTES_EVENTS = [
 
 
 class EventFlags(IntFlag):
+    """Event flags."""
     TIME_STAMP_TICK = alsa.SND_SEQ_TIME_STAMP_TICK
     TIME_STAMP_REAL = alsa.SND_SEQ_TIME_STAMP_REAL
     TIME_STAMP_MASK = alsa.SND_SEQ_TIME_STAMP_MASK
@@ -182,6 +194,38 @@ _snd_seq_event_t = NewType("_snd_seq_event_t", Any)
 
 
 class Event:
+    """Base class for ALSA sequencer events.
+
+    Normally not instantiated directly – specialized subclasses will be used.
+
+    Most attributes are optional – when not set some defaults will be used
+    when passing this to ALSA. :attr:`time` and :attr:`tick` cannot be ever be
+    both set.
+
+    Contains python representation of ALSA :alsa:`snd_seq_event_t`.
+
+    :param event: event type
+    :param flags: event flags
+    :param tag: event tag
+    :param queue_id: queue id for the event. `None` for direct dispatch.
+    :param time: event time in seconds and nanoseconds
+    :param tick: event time in MIDI ticks
+    :param source: event source address
+    :param dest: event destination address
+    :param relative: When true then :attr:`tick` or :attr:`tick` are relative
+    :param raw_data: Unparsed raw data part of the ALSA event. Note: this is not MIDI data.
+
+    :ivar event: event type
+    :ivar flags: event flags
+    :ivar tag: event tag
+    :ivar queue_id: queue id for the event. `None` for direct dispatch.
+    :ivar time: event time in seconds and nanoseconds
+    :ivar tick: event time in MIDI ticks
+    :ivar source: event source address
+    :ivar dest: event destination address
+    :ivar relative: When true then :attr:`tick` or :attr:`tick` are relative
+    :ivar raw_data: Unparsed raw data part of the ALSA event. Note: this is not MIDI data.
+    """
     _specialized = {}
     type = None
 
@@ -340,6 +384,15 @@ class Event:
 
 
 class MidiBytesEvent(Event):
+    """Pseudo ALSA event to hold MIDI messages as byte sequences.
+
+    Used to interface code that operates on MIDI bytes.
+
+    :param midi_bytes: the MIDI message
+    :param kwargs: :class:`Event` constructor parameters
+
+    :ivar midi_bytes: the MIDI message
+    """
     midi_bytes: bytes
 
     def __init__(self,
@@ -363,11 +416,22 @@ def _specialized_event_class(event_type):
     def decorator(cls):
         cls.type = event_type
         Event._specialized[event_type.value] = cls
+        if "\n" not in cls.__doc__:
+            base_doc = cls.__base__.__doc__
+            cls.__doc__ += "\n" + base_doc.split("\n", 1)[1]
         return cls
     return decorator
 
 
 class ResultEventBase(Event):
+    """Base class for :class:`SystemEvent` and :class:`ResultEvent`.
+
+    :param event: event
+    :param result: result
+
+    :ivar event: event
+    :ivar result: result
+    """
     event: int
     result: int
 
@@ -397,6 +461,16 @@ class ResultEventBase(Event):
 
 
 class NoteEventBase(Event):
+    """Base class for :class:`NoteEvent`, :class:`NoteOnEvent` and :class:`NoteOffEvent`.
+
+    :param note: MIDI note number
+    :param channel: MIDI channel
+    :param velocity: note velocity
+
+    :ivar note: MIDI note number
+    :ivar channel: MIDI channel
+    :ivar velocity: note velocity
+    """
     note: int
     channel: int
     velocity: int
@@ -432,6 +506,16 @@ class NoteEventBase(Event):
 
 
 class ControlChangeEventBase(Event):
+    """Base class for various control/parameter change events.
+
+    :param channel: MIDI channel
+    :param param: parameter number
+    :param value: new value
+
+    :ivar channel: MIDI channel
+    :ivar param: parameter number
+    :ivar value: new value
+    """
     channel: int
     param: int
     value: int
@@ -467,6 +551,15 @@ class ControlChangeEventBase(Event):
 
 
 class ParamChangeEventBase(Event):
+    """Base class for various parameter change events.
+
+    :param channel: MIDI channel
+    :param value: new value
+
+    :ivar channel: MIDI channel
+    :ivar value: new value
+    """
+
     channel: int
     value: int
 
@@ -496,6 +589,12 @@ class ParamChangeEventBase(Event):
 
 
 class QueueControlEventBase(Event):
+    """Base class for MIDI clock events and queue control events.
+
+    :param control_queue: affected queue
+
+    :ivar control_queue: affected queue id
+    """
     control_queue: Optional[int]
 
     def __init__(self,
@@ -530,6 +629,12 @@ class QueueControlEventBase(Event):
 
 
 class AddressEventBase(Event):
+    """Base class for events containing single sequencer address.
+
+    :param addr: sequencer address
+
+    :ivar addr: sequencer address
+    """
     addr: Address
 
     def __init__(self,
@@ -555,6 +660,15 @@ class AddressEventBase(Event):
 
 
 class ConnectEventBase(Event):
+    """Base class for sequencer connect and disconnect events.
+
+    :param sender: sender address
+    :param dest: destination address
+
+    :ivar sender: sender address
+    :ivar dest: destination address
+    """
+
     connect_sender: Address
     connect_dest: Address
 
@@ -588,6 +702,13 @@ class ConnectEventBase(Event):
 
 
 class ExternalDataEventBase(Event):
+    """Base class for events containing external data.
+
+    :param data: the data
+
+    :ivar data: the data
+    """
+
     data: bytes
 
     def __init__(self,
@@ -619,16 +740,33 @@ class ExternalDataEventBase(Event):
 
 @_specialized_event_class(EventType.SYSTEM)
 class SystemEvent(ResultEventBase):
+    """System status event."""
     pass
 
 
 @_specialized_event_class(EventType.RESULT)
 class ResultEvent(ResultEventBase):
+    """Returned result status event."""
     pass
 
 
 @_specialized_event_class(EventType.NOTE)
 class NoteEvent(NoteEventBase):
+    """Note event – a Note On followed by a Note Off.
+
+    :param note: MIDI note number
+    :param channel: MIDI channel
+    :param velocity: note velocity
+    :param duration: note duration
+    :param off_velocity: Note Off velocity
+
+    :ivar note: MIDI note number
+    :ivar channel: MIDI channel
+    :ivar velocity: note velocity
+    :ivar duration: note duration
+    :ivar off_velocity: Note Off velocity
+    """
+
     duration: int
     off_velocity: int
 
@@ -663,93 +801,102 @@ class NoteEvent(NoteEventBase):
 
 @_specialized_event_class(EventType.NOTEON)
 class NoteOnEvent(NoteEventBase):
-    pass
+    """Note On event."""
 
 
 @_specialized_event_class(EventType.NOTEOFF)
 class NoteOffEvent(NoteEventBase):
-    pass
+    """Note Off event."""
 
 
 @_specialized_event_class(EventType.KEYPRESS)
 class KeyPressureEvent(NoteEventBase):
-    pass
+    """Key pressure changed (aftertouch) event."""
 
 
 @_specialized_event_class(EventType.CONTROLLER)
 class ControlChangeEvent(ControlChangeEventBase):
-    pass
+    """Control Change event."""
 
 
 @_specialized_event_class(EventType.PGMCHANGE)
 class ProgramChangeEvent(ParamChangeEventBase):
-    pass
+    """Program Change event."""
 
 
 @_specialized_event_class(EventType.CHANPRESS)
 class ChannelPressureEvent(ParamChangeEventBase):
-    pass
+    """Channel Pressure event."""
 
 
 @_specialized_event_class(EventType.PITCHBEND)
 class PitchBendEvent(ParamChangeEventBase):
-    pass
+    """Pitch Bend event."""
 
 
 @_specialized_event_class(EventType.CONTROL14)
 class Control14BitChangeEvent(ControlChangeEventBase):
-    pass
+    """14-bit Control Change event."""
 
 
 @_specialized_event_class(EventType.NONREGPARAM)
 class NonRegisteredParameterChangeEvent(ControlChangeEventBase):
-    pass
+    """Non Registered Parameter Change event."""
 
 
 @_specialized_event_class(EventType.REGPARAM)
 class RegisteredParameterChangeEvent(ControlChangeEventBase):
-    pass
+    """Registered Parameter Change event."""
 
 
 @_specialized_event_class(EventType.SONGPOS)
 class SongPositionPointerEvent(ParamChangeEventBase):
-    pass
+    """Song Position Pointer event."""
 
 
 @_specialized_event_class(EventType.SONGSEL)
 class SongSelectEvent(ParamChangeEventBase):
-    pass
+    """Song Select event."""
 
 
 # how is it encoded into snd_seq_ev_ctrl_t?
 @_specialized_event_class(EventType.TIMESIGN)
 class TimeSignatureEvent(ParamChangeEventBase):
-    pass
+    """Time Signature event."""
 
 
 # how is it encoded into snd_seq_ev_ctrl_t?
 @_specialized_event_class(EventType.KEYSIGN)
 class KeySignatureEvent(ParamChangeEventBase):
-    pass
+    """Key Signature event."""
 
 
 @_specialized_event_class(EventType.START)
 class StartEvent(QueueControlEventBase):
-    pass
+    """Start event."""
 
 
 @_specialized_event_class(EventType.CONTINUE)
 class ContinueEvent(QueueControlEventBase):
-    pass
+    """Continue event."""
 
 
 @_specialized_event_class(EventType.STOP)
 class StopEvent(QueueControlEventBase):
-    pass
+    """Stop event."""
 
 
 @_specialized_event_class(EventType.SETPOS_TICK)
 class SetQueuePositionTickEvent(QueueControlEventBase):
+    """Set Queue Position Tick event.
+
+    :param control_queue: affected queue
+    :param position: new position
+
+    :ivar control_queue: affected queue id
+    :ivar position: new position
+    """
+
     position: int
 
     def __init__(self,
@@ -778,6 +925,15 @@ class SetQueuePositionTickEvent(QueueControlEventBase):
 
 @_specialized_event_class(EventType.SETPOS_TIME)
 class SetQueuePositionTimeEvent(QueueControlEventBase):
+    """Set Queue Position Time event.
+
+    :param control_queue: affected queue
+    :param position: new position
+
+    :ivar control_queue: affected queue id
+    :ivar position: new position
+    """
+
     position: RealTime
 
     def __init__(self,
@@ -808,6 +964,16 @@ class SetQueuePositionTimeEvent(QueueControlEventBase):
 
 @_specialized_event_class(EventType.TEMPO)
 class SetQueueTempoEvent(QueueControlEventBase):
+    """Set Queue Position Time event.
+
+    :param control_queue: affected queue
+    :param midi_tempo: MIDI tempo (microseconds per quarter note)
+    :param bpm: beats per minute as an alternative to `midi_tempo`
+
+    :ivar control_queue: affected queue id
+    :ivar midi_tempo: MIDI tempo (microseconds per quarter note)
+    """
+
     def __init__(self,
                  midi_tempo: int = None,
                  *,
@@ -825,6 +991,7 @@ class SetQueueTempoEvent(QueueControlEventBase):
 
     @property
     def bpm(self):
+        """Approximate beats per minute value for the selected tempo."""
         return 60000000.0 / self.midi_tempo
 
     def __repr__(self):
@@ -849,16 +1016,29 @@ class SetQueueTempoEvent(QueueControlEventBase):
 
 @_specialized_event_class(EventType.CLOCK)
 class ClockEvent(QueueControlEventBase):
+    """MIDI Clock event."""
     pass
 
 
 @_specialized_event_class(EventType.TICK)
 class TickEvent(QueueControlEventBase):
+    """MIDI Tick event."""
     pass
 
 
 @_specialized_event_class(EventType.QUEUE_SKEW)
 class QueueSkewEvent(QueueControlEventBase):
+    """Queue Skew event.
+
+    :param control_queue: affected queue
+    :param value: skew value
+    :param base: skew base
+
+    :ivar control_queue: affected queue id
+    :ivar value: skew value
+    :ivar base: skew base
+    """
+
     value: int
     base: int
 
@@ -892,6 +1072,15 @@ class QueueSkewEvent(QueueControlEventBase):
 
 @_specialized_event_class(EventType.SYNC_POS)
 class SyncPositionChangedEvent(QueueControlEventBase):
+    """Sync Position Changed event.
+
+    :param control_queue: affected queue
+    :param position: new position
+
+    :ivar control_queue: affected queue id
+    :ivar position: new position
+    """
+
     position: int
 
     def __init__(self,
@@ -920,98 +1109,110 @@ class SyncPositionChangedEvent(QueueControlEventBase):
 
 @_specialized_event_class(EventType.TUNE_REQUEST)
 class TuneRequestEvent(Event):
+    """Tune request event."""
     pass
 
 
 @_specialized_event_class(EventType.RESET)
 class ResetEvent(Event):
+    """Reset event."""
     pass
 
 
 @_specialized_event_class(EventType.SENSING)
 class ActiveSensingEvent(Event):
+    """Active Sensing event."""
     pass
 
 
 @_specialized_event_class(EventType.ECHO)
 class EchoEvent(Event):
+    """Echo event."""
     def __repr__(self):
         return (f"<{self.__class__.__name__} data={self.raw_data!r}>")
 
 
 @_specialized_event_class(EventType.OSS)
 class OSSEvent(Event):
+    """OSS emulation event."""
     def __repr__(self):
         return (f"<{self.__class__.__name__} data={self.raw_data!r}>")
 
 
 @_specialized_event_class(EventType.CLIENT_START)
 class ClientStartEvent(AddressEventBase):
-    pass
+    """Client start event."""
 
 
 @_specialized_event_class(EventType.CLIENT_EXIT)
 class ClientExitEvent(AddressEventBase):
-    pass
+    """Client exit event."""
 
 
 @_specialized_event_class(EventType.CLIENT_CHANGE)
 class ClientChangeEvent(AddressEventBase):
-    pass
+    """Client change event."""
 
 
 @_specialized_event_class(EventType.PORT_START)
 class PortStartEvent(AddressEventBase):
-    pass
+    """Port start event."""
 
 
 @_specialized_event_class(EventType.PORT_EXIT)
 class PortExitEvent(AddressEventBase):
-    pass
+    """Port exit event."""
 
 
 @_specialized_event_class(EventType.PORT_CHANGE)
 class PortChangeEvent(AddressEventBase):
-    pass
+    """Port change event."""
 
 
 @_specialized_event_class(EventType.PORT_SUBSCRIBED)
 class PortSubscribedEvent(ConnectEventBase):
-    pass
+    """Port subscribed event."""
 
 
 @_specialized_event_class(EventType.PORT_UNSUBSCRIBED)
 class PortUnsubscribedEvent(ConnectEventBase):
-    pass
+    """Port unsubscribed event."""
 
 
 @_specialized_event_class(EventType.SYSEX)
 class SysExEvent(ExternalDataEventBase):
-    pass
+    """System Exclusive message event."""
 
 
 @_specialized_event_class(EventType.BOUNCE)
 class BounceEvent(ExternalDataEventBase):
-    pass
+    """Error event."""
 
 
 @_specialized_event_class(EventType.USR_VAR0)
 class UserVar0Event(ExternalDataEventBase):
-    pass
+    """USR_VAR0 event."""
 
 
 @_specialized_event_class(EventType.USR_VAR1)
 class UserVar1Event(ExternalDataEventBase):
-    pass
+    """USR_VAR1 event."""
 
 
 @_specialized_event_class(EventType.USR_VAR2)
 class UserVar2Event(ExternalDataEventBase):
-    pass
+    """USR_VAR2 event."""
 
 
 @_specialized_event_class(EventType.USR_VAR3)
 class UserVar3Event(ExternalDataEventBase):
+    """USR_VAR3 event."""
+    pass
+
+
+@_specialized_event_class(EventType.USR_VAR4)
+class UserVar4Event(ExternalDataEventBase):
+    """USR_VAR4 event."""
     pass
 
 
@@ -1032,5 +1233,5 @@ __all__ = [
         "ClientStartEvent", "ClientExitEvent", "ClientChangeEvent", "PortStartEvent",
         "PortExitEvent", "PortChangeEvent", "PortSubscribedEvent", "PortUnsubscribedEvent",
         "SysExEvent", "BounceEvent", "UserVar0Event", "UserVar1Event", "UserVar2Event",
-        "UserVar3Event",
+        "UserVar3Event", "UserVar4Event",
         ]

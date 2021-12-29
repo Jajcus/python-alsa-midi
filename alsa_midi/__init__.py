@@ -15,7 +15,7 @@ from .event import (ActiveSensingEvent, BounceEvent, ChannelPressureEvent, Clien
                     SongPositionPointerEvent, SongSelectEvent, StartEvent, StopEvent,
                     SyncPositionChangedEvent, SysExEvent, SystemEvent, TickEvent,
                     TimeSignatureEvent, TuneRequestEvent, UserVar0Event, UserVar1Event,
-                    UserVar2Event, UserVar3Event)
+                    UserVar2Event, UserVar3Event, UserVar4Event)
 from .exceptions import ALSAError, Error, StateError
 from .port import READ_PORT, RW_PORT, WRITE_PORT, Port, PortCaps, PortInfo, PortType
 from .queue import Queue
@@ -41,5 +41,5 @@ __all__ = [
         "ClientStartEvent", "ClientExitEvent", "ClientChangeEvent", "PortStartEvent",
         "PortExitEvent", "PortChangeEvent", "PortSubscribedEvent", "PortUnsubscribedEvent",
         "SysExEvent", "BounceEvent", "UserVar0Event", "UserVar1Event", "UserVar2Event",
-        "UserVar3Event",
+        "UserVar3Event", "UserVar4Event"
         ]

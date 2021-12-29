@@ -5,7 +5,9 @@ Miscelanous objects
 
 .. autoclass:: Address
 
-.. autoclass:: ClientInfo 
+.. autoclass:: RealTime
+
+.. autoclass:: ClientInfo
 
 .. py:data:: alsa
 
