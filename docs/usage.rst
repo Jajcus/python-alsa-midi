@@ -215,4 +215,14 @@ safely passed around. Simultaneous access from different threads should still
 be avoided.
 
 
+MIDO back-end
+-------------
+
+The package also includes a `MIDO`_ back-end module. To use it set shell
+variable $MIDO_BACKEND to 'alsa_midi.mido_backend' or programmatically::
+
+  mido.set_backend('alsa_midi.mido_backend')
+
+
 .. _cffi: http://cffi.readthedocs.org/
+.. _MIDO: https://mido.readthedocs.io/

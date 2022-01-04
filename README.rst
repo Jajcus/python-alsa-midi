@@ -23,6 +23,8 @@ Features
 
 * Only Python code, no need to compile a binary module. Requires `cffi`_, though.
 
+* `MIDO`_ backend provided
+
 Installation
 ------------
 
@@ -74,5 +76,14 @@ Simple example::
   client.event_output(event2)
   client.drain_output()
 
+Using with MIDO
+---------------
+
+python-alsa-midi can be used as a `MIDO`_ back-end too::
+
+  export MIDO_BACKEND=alsa_midi.MIDO_BACKEND
+  mido/examples/midifiles/play_midi_file.py file.mid
+
 
 .. _cffi: http://cffi.readthedocs.org/
+.. _MIDO: https://mido.readthedocs.io/
