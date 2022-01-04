@@ -224,6 +224,7 @@ class SequencerClientBase:
             err = alsa.snd_midi_event_new(1024, parser_p)
             _check_alsa_error(err)
             parser = ffi.gc(parser_p[0], alsa.snd_midi_event_free)
+            alsa.snd_midi_event_no_status(parser, 1)
             self._event_parser = parser
         return parser
 
