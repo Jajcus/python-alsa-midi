@@ -575,6 +575,27 @@ class SequencerClientBase:
                 break
         return result
 
+    def get_client_info(self, client_id: Optional[int] = None) -> ClientInfo:
+        """Obtain information about a client.
+
+        Wraps :alsa:`snd_seq_get_client_info` or :alsa:`snd_seq_get_any_client_info`.
+
+        :param client_id: client to get information about. Default: self.
+
+        :return: client information
+        """
+        info_p = ffi.new("snd_seq_client_info_t **")
+        err = alsa.snd_seq_client_info_malloc(info_p)
+        _check_alsa_error(err)
+        info = ffi.gc(info_p[0], alsa.snd_seq_client_info_free)
+        if client_id is None:
+            err = alsa.snd_seq_get_client_info(self.handle, info)
+        else:
+            err = alsa.snd_seq_get_any_client_info(self.handle, client_id, info)
+        _check_alsa_error(err)
+        result = ClientInfo._from_alsa(info)
+        return result
+
     @overload
     def query_next_client(self, previous: ClientInfo) -> Optional[ClientInfo]:
         ...
@@ -613,6 +634,8 @@ class SequencerClientBase:
         """Obtain information about a specific port.
 
         Wraps :alsa:`snd_seq_get_port_info` or :alsa:`snd_seq_get_any_port_info`.
+
+        :param port: port to get information about
 
         :return: port information
         """

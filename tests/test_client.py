@@ -287,6 +287,25 @@ def test_client_info():
 
 
 @pytest.mark.require_alsa_seq
+def test_get_client_info(alsa_seq_state):
+    client = SequencerClient("test")
+    alsa_seq_state.load()
+
+    info = client.get_client_info()
+    assert isinstance(info, ClientInfo)
+    assert info.name == "test"
+
+    for client_id, alsa_client in alsa_seq_state.clients.items():
+        info = client.get_client_info(client_id)
+        assert isinstance(info, ClientInfo)
+        assert info.name == alsa_client.name
+        assert info.type is not None
+        assert info.type.name.lower() == alsa_client.type.lower()
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
 def test_query_next_client(alsa_seq_state):
     client = SequencerClient("test")
     alsa_seq_state.load()
