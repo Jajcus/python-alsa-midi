@@ -3,6 +3,7 @@ import asyncio
 import errno
 import select
 import time
+from collections import namedtuple
 from enum import IntEnum, IntFlag
 from functools import partial
 from typing import Any, Callable, List, NewType, Optional, Tuple, Union, overload
@@ -148,6 +149,43 @@ class ClientInfo:
         alsa.snd_seq_client_info_set_broadcast_filter(info, 1 if self.broadcast_filter else 0)
         alsa.snd_seq_client_info_set_error_bounce(info, 1 if self.error_bounce else 0)
         return info
+
+
+_snd_seq_system_info_t = NewType("_snd_seq_system_info_t", object)
+
+
+class SystemInfo(namedtuple("SystemInfo", "queues clients ports channels cur_clients cur_queues")):
+    """System information.
+
+    Represents data from :alsa:`snd_seq_system_info_t`
+
+    :ivar queues: maximum number of clients
+    :ivar clients: maximum number of ports
+    :ivar ports: maximum number of channels
+    :ivar channels: maximum number of channels
+    :ivar cur_clients: current number of clients
+    :ivar cur_queues: current number of queues
+    """
+    queues: int
+    clients: int
+    ports: int
+    channels: int
+    cur_clients: int
+    cur_queues: int
+
+    __slots__ = ()
+
+    @classmethod
+    def _from_alsa(cls, info: _snd_seq_system_info_t):
+        """Create a ClientInfo object from ALSA :alsa:`snd_seq_system_info_t`."""
+        return cls(
+                queues=alsa.snd_seq_system_info_get_queues(info),
+                clients=alsa.snd_seq_system_info_get_clients(info),
+                ports=alsa.snd_seq_system_info_get_ports(info),
+                channels=alsa.snd_seq_system_info_get_channels(info),
+                cur_clients=alsa.snd_seq_system_info_get_cur_clients(info),
+                cur_queues=alsa.snd_seq_system_info_get_cur_queues(info),
+                )
 
 
 class SequencerClientBase:
@@ -631,6 +669,22 @@ class SequencerClientBase:
             _check_alsa_error(result)
             if remainder is None:
                 break
+        return result
+
+    def get_system_info(self) -> SystemInfo:
+        """Obtain information about the sequencer.
+
+        Wraps :alsa:`snd_seq_system_info`.
+
+        :return: system information
+        """
+        info_p = ffi.new("snd_seq_system_info_t **")
+        err = alsa.snd_seq_system_info_malloc(info_p)
+        _check_alsa_error(err)
+        info = ffi.gc(info_p[0], alsa.snd_seq_system_info_free)
+        err = alsa.snd_seq_system_info(self.handle, info)
+        _check_alsa_error(err)
+        result = SystemInfo._from_alsa(info)
         return result
 
     def get_client_info(self, client_id: Optional[int] = None) -> ClientInfo:
@@ -1307,4 +1361,5 @@ class AsyncSequencerClient(SequencerClientBase):
         return await self._event_output_wait(func)
 
 
-__all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType", "SequencerType"]
+__all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType", "SequencerType",
+           "SystemInfo"]

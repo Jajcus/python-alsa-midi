@@ -5,7 +5,7 @@ import sys
 import pytest
 
 from alsa_midi import (ALSAError, AsyncSequencerClient, ClientInfo, ClientType, SequencerClient,
-                       SequencerType, StateError, alsa, ffi)
+                       SequencerType, StateError, SystemInfo, alsa, ffi)
 from alsa_midi.client import SequencerClientBase
 from alsa_midi.event import EventType, MidiBytesEvent, NoteOffEvent, NoteOnEvent
 
@@ -334,7 +334,7 @@ def test_client_info():
 
 
 @pytest.mark.require_alsa_seq
-def test_get_client_info(alsa_seq_state):
+def test_get_system_info(alsa_seq_state):
     client = SequencerClient("test")
     alsa_seq_state.load()
 
@@ -348,6 +348,23 @@ def test_get_client_info(alsa_seq_state):
         assert info.name == alsa_client.name
         assert info.type is not None
         assert info.type.name.lower() == alsa_client.type.lower()
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_get_client_info(alsa_seq_state):
+    client = SequencerClient("test")
+    alsa_seq_state.load()
+
+    info = client.get_system_info()
+    assert isinstance(info, SystemInfo)
+    assert isinstance(info.queues, int)
+    assert info.clients == alsa_seq_state.max_clients
+    assert isinstance(info.ports, int)
+    assert isinstance(info.channels, int)
+    assert info.cur_clients == alsa_seq_state.cur_clients
+    assert isinstance(info.cur_queues, int)
 
     client.close()
 

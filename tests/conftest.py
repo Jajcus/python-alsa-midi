@@ -127,6 +127,8 @@ class AlsaQueueState:
         return result
 
 
+PROC_MAX_CLIENTS_LINE_RE = re.compile(r'\s+max\s+clients\s*:\s*(\d+)')
+PROC_CUR_CLIENTS_LINE_RE = re.compile(r'\s+cur\s+clients\s*:\s*(\d+)')
 PROC_CLIENT_LINE_RE = re.compile(r'Client\s+(\d+)\s*:\s*\"([^"]*)"\s+\[([^\]]*)\]')
 PROC_PORT_LINE_RE = re.compile(r'\s+Port\s+(\d+)\s*:\s*\"([^"]*)"\s+\(([^\)]*)\)')
 PROC_CONN_TO_LINE_RE = re.compile(r'\s+Connecting To:\s*(\S.*)$')
@@ -145,11 +147,15 @@ class AlsaSequencerState:
     clients: Dict[int, AlsaClientState]
     ports: Dict[Tuple[int, int], AlsaPortState]
     queues: Dict[int, AlsaQueueState]
+    max_clients: int
+    cur_clients: int
 
     def __init__(self):
         self.clients = {}
         self.ports = {}
         self.queues = {}
+        self.max_clients = 0
+        self.cur_clients = 0
 
     def __str__(self):
         result = "ALSA Sequencer State:\n"
@@ -168,6 +174,12 @@ class AlsaSequencerState:
             client = None
             port = None
             for line in proc_f:
+                match = PROC_MAX_CLIENTS_LINE_RE.match(line)
+                if match:
+                    self.max_clients = int(match.group(1))
+                match = PROC_CUR_CLIENTS_LINE_RE.match(line)
+                if match:
+                    self.cur_clients = int(match.group(1))
                 match = PROC_CLIENT_LINE_RE.match(line)
                 if match:
                     client = AlsaClientState(int(match.group(1)), match.group(2), match.group(3))
