@@ -228,6 +228,13 @@ class SequencerClientBase:
             self._event_parser = parser
         return parser
 
+    def get_sequencer_name(self) -> str:
+        """Get sequencer name.
+
+        Wraps :alsa:`snd_seq_name`."""
+        self._check_handle()
+        return ffi.string(alsa.snd_seq_name(self.handle)).decode()
+
     def create_port(self,
                     name: str,
                     caps: PortCaps = RW_PORT,

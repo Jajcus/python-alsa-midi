@@ -64,6 +64,13 @@ def test_client_open_del_alsa(alsa_seq_state):
 
 
 @pytest.mark.require_alsa_seq
+def test_sequencer_name():
+    client = SequencerClient("test123")
+    assert client.get_sequencer_name() == "default"
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
 def test_open_blocking():
     with pytest.raises(ValueError):
         SequencerClient("test", mode=0)
