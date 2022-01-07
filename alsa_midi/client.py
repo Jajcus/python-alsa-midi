@@ -252,6 +252,40 @@ class SequencerClientBase:
         _check_alsa_error(result)
         return SequencerType(result)
 
+    def get_output_buffer_size(self) -> int:
+        """Get output buffer size.
+
+        Wraps :alsa:`snd_seq_get_output_buffer_size`."""
+        self._check_handle()
+        return alsa.snd_seq_get_output_buffer_size(self.handle)
+
+    def set_output_buffer_size(self, size: int):
+        """Change output buffer size.
+
+        :param size: the size of output buffer in bytes
+
+        Wraps :alsa:`snd_seq_set_output_buffer_size`."""
+        self._check_handle()
+        err = alsa.snd_seq_set_output_buffer_size(self.handle, size)
+        _check_alsa_error(err)
+
+    def get_input_buffer_size(self) -> int:
+        """Get input buffer size.
+
+        Wraps :alsa:`snd_seq_get_input_buffer_size`."""
+        self._check_handle()
+        return alsa.snd_seq_get_input_buffer_size(self.handle)
+
+    def set_input_buffer_size(self, size: int):
+        """Change input buffer size.
+
+        :param size: the size of input buffer in bytes
+
+        Wraps :alsa:`snd_seq_set_input_buffer_size`."""
+        self._check_handle()
+        err = alsa.snd_seq_set_input_buffer_size(self.handle, size)
+        _check_alsa_error(err)
+
     def create_port(self,
                     name: str,
                     caps: PortCaps = RW_PORT,

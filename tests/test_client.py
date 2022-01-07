@@ -1,5 +1,6 @@
 
 import errno
+import sys
 
 import pytest
 
@@ -74,6 +75,38 @@ def test_sequencer_name():
 def test_sequencer_type():
     client = SequencerClient("test123")
     assert client.get_sequencer_type() == SequencerType.HW
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_output_bufer_size():
+    client = SequencerClient("test")
+    ev_size = ffi.sizeof("snd_seq_event_t")
+    client.set_output_buffer_size(100 * ev_size)
+    assert client.get_output_buffer_size() == 100 * ev_size
+    client.set_output_buffer_size(10 * ev_size)
+    assert client.get_output_buffer_size() == 10 * ev_size
+    with pytest.raises(OverflowError):
+        client.set_output_buffer_size(-1)
+    with pytest.raises(ALSAError) as err:
+        client.set_output_buffer_size(sys.maxsize)
+    assert err.value.errnum == -errno.ENOMEM
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_input_bufer_size():
+    client = SequencerClient("test")
+    ev_size = ffi.sizeof("snd_seq_event_t")
+    client.set_input_buffer_size(100 * ev_size)
+    assert client.get_input_buffer_size() == 100 * ev_size
+    client.set_input_buffer_size(10 * ev_size)
+    assert client.get_input_buffer_size() == 10 * ev_size
+    with pytest.raises(OverflowError):
+        client.set_input_buffer_size(-1)
+    with pytest.raises(ALSAError) as err:
+        client.set_input_buffer_size(sys.maxsize)
+    assert err.value.errnum == -errno.ENOMEM
     client.close()
 
 
