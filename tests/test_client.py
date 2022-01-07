@@ -4,7 +4,7 @@ import errno
 import pytest
 
 from alsa_midi import (ALSAError, AsyncSequencerClient, ClientInfo, ClientType, SequencerClient,
-                       StateError, alsa, ffi)
+                       SequencerType, StateError, alsa, ffi)
 from alsa_midi.client import SequencerClientBase
 from alsa_midi.event import EventType, MidiBytesEvent, NoteOffEvent, NoteOnEvent
 
@@ -67,6 +67,13 @@ def test_client_open_del_alsa(alsa_seq_state):
 def test_sequencer_name():
     client = SequencerClient("test123")
     assert client.get_sequencer_name() == "default"
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_sequencer_type():
+    client = SequencerClient("test123")
+    assert client.get_sequencer_type() == SequencerType.HW
     client.close()
 
 

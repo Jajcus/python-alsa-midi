@@ -41,6 +41,14 @@ class ClientType(IntEnum):
     KERNEL = alsa.SND_SEQ_KERNEL_CLIENT
 
 
+class SequencerType(IntEnum):
+    """Sequencer type constants."""
+    _UNSET = 0
+    HW = alsa.SND_SEQ_TYPE_HW
+    SHM = alsa.SND_SEQ_TYPE_SHM
+    INET = alsa.SND_SEQ_TYPE_INET
+
+
 _snd_seq_client_info_t = NewType("_snd_seq_client_info_t", object)
 
 
@@ -234,6 +242,15 @@ class SequencerClientBase:
         Wraps :alsa:`snd_seq_name`."""
         self._check_handle()
         return ffi.string(alsa.snd_seq_name(self.handle)).decode()
+
+    def get_sequencer_type(self) -> SequencerType:
+        """Get sequencer type.
+
+        Wraps :alsa:`snd_seq_type`."""
+        self._check_handle()
+        result = alsa.snd_seq_type(self.handle)
+        _check_alsa_error(result)
+        return SequencerType(result)
 
     def create_port(self,
                     name: str,
@@ -1256,4 +1273,4 @@ class AsyncSequencerClient(SequencerClientBase):
         return await self._event_output_wait(func)
 
 
-__all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType"]
+__all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType", "SequencerType"]

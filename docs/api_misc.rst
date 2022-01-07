@@ -31,6 +31,10 @@ Miscelanous objects
    :members:
    :undoc-members:
 
+.. autoclass:: SequencerType
+   :members:
+   :undoc-members:
+
 .. autoclass:: SequencerClientBase
    :members:
 
