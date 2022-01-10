@@ -8,7 +8,7 @@ from .exceptions import Error, StateError
 from .util import _check_alsa_error
 
 if TYPE_CHECKING:
-    from .client import SequencerClientBase, _snd_seq_t
+    from .client import SequencerClientBase, SubscriptionQuery, SubscriptionQueryType, _snd_seq_t
 
 
 class PortCaps(IntFlag):
@@ -174,6 +174,18 @@ class Port:
         if self.client is None:
             raise StateError("Already closed")
         return self.client.set_port_info(self, info)
+
+    def list_subscribers(self, type: 'SubscriptionQueryType' = None) -> List['SubscriptionQuery']:
+        """Lists subscribers accessing a port.
+
+        Wraps :alsa:`snd_seq_query_port_subscribers`.
+
+        :param type: limit query to the specific type
+        """
+
+        if self.client is None:
+            raise StateError("Already closed")
+        return self.client.list_port_subscribers(self, type)
 
 
 _snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)

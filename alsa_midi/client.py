@@ -1140,6 +1140,46 @@ class SequencerClientBase:
         result = SubscriptionQuery._from_alsa(a_query)
         return result
 
+    def list_port_subscribers(self,
+                              port: AddressType,
+                              type: Optional[SubscriptionQueryType] = None,
+                              ) -> List[SubscriptionQuery]:
+        """Lists subscribers accessing a port.
+
+        Wraps :alsa:`snd_seq_query_port_subscribers`.
+
+        :param port: Port address to query
+        :param type: limit query to the specific type
+        """
+        if type is None:
+            types = [SubscriptionQueryType.READ, SubscriptionQueryType.WRITE]
+        else:
+            types = [type]
+
+        self._check_handle()
+        query_p = ffi.new("snd_seq_query_subscribe_t **")
+        err = alsa.snd_seq_query_subscribe_malloc(query_p)
+        _check_alsa_error(err)
+        query = ffi.gc(query_p[0], alsa.snd_seq_query_subscribe_free)
+
+        client_id, port_id = Address(port)
+
+        result = []
+
+        for type in types:
+            alsa.snd_seq_query_subscribe_set_client(query, client_id)
+            alsa.snd_seq_query_subscribe_set_port(query, port_id)
+            alsa.snd_seq_query_subscribe_set_type(query, type)
+            i = 0
+            while True:
+                alsa.snd_seq_query_subscribe_set_index(query, i)
+                err = alsa.snd_seq_query_port_subscribers(self.handle, query)
+                if err < 0:
+                    break
+                result.append(SubscriptionQuery._from_alsa(query))
+                i += 1
+        return result
+
 
 class SequencerClient(SequencerClientBase):
     """ALSA sequencer client connection.
