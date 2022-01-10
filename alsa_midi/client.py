@@ -188,6 +188,101 @@ class SystemInfo(namedtuple("SystemInfo", "queues clients ports channels cur_cli
                 )
 
 
+_snd_seq_query_subscribe_t = NewType("_snd_seq_query_subscribe_t", object)
+
+
+class SubscriptionQueryType(IntEnum):
+    READ = alsa.SND_SEQ_QUERY_SUBS_READ
+    WRITE = alsa.SND_SEQ_QUERY_SUBS_WRITE
+
+
+class SubscriptionQuery:
+    """Port subscription (connection) information.
+
+    Represents data from :alsa:`snd_seq_query_subscribe_t`
+
+    :param root: address of the port queried
+    :param type: either :data:`SubscriptionQueryType.READ` or :data:`SubscriptionQueryType.WRITE`
+    :param index: subscription index inside query result
+    :param num_subs: number of subscription in query result
+    :param addr: address of the subscriber
+    :param queue_id: queue id
+    :param exclusive: exclusive access
+    :param time_update: time update enabled
+    :param time_real: user real time stamps
+
+    :ivar root: address of the port queried
+    :ivar type: either :data:`SubscriptionQueryType.READ` or :data:`SubscriptionQueryType.WRITE`
+    :ivar index: subscription index inside query result
+    :ivar num_subs: number of subscription in query result
+    :ivar addr: address of the subscriber
+    :ivar queue_id: queue id
+    :ivar exclusive: exclusive access
+    :ivar time_update: time update enabled
+    :ivar time_real: user real time stamps
+    """
+    root: Address
+    type: SubscriptionQueryType
+    index: int
+    num_subs: int
+    addr: Address
+    queue_id: int
+    exclusive: bool
+    time_update: bool
+    time_real: bool
+
+    def __init__(self,
+                 root: AddressType,
+                 type: SubscriptionQueryType,
+                 *,
+                 index: int = 0,
+                 num_subs: int = 0,
+                 addr: AddressType = (0, 0),
+                 queue_id: int = 0,
+                 exclusive: bool = False,
+                 time_update: bool = False,
+                 time_real: bool = False):
+
+        self.root = Address(root)
+        self.type = type
+        self.index = index
+        self.num_subs = num_subs
+        self.addr = Address(addr)
+        self.queue_id = queue_id
+        self.exlusive = bool(exclusive)
+        self.time_update = bool(time_update)
+        self.time_real = bool(time_real)
+
+    @classmethod
+    def _from_alsa(cls, query: _snd_seq_query_subscribe_t):
+        """Create a ClientInfo object from ALSA :alsa:`snd_seq_query_subscribe_t`."""
+        a_root = alsa.snd_seq_query_subscribe_get_root(query)
+        a_addr = alsa.snd_seq_query_subscribe_get_addr(query)
+        return cls(
+                root=Address(a_root.client, a_root.port),
+                type=SubscriptionQueryType(alsa.snd_seq_query_subscribe_get_type(query)),
+                index=alsa.snd_seq_query_subscribe_get_index(query),
+                num_subs=alsa.snd_seq_query_subscribe_get_num_subs(query),
+                addr=Address(a_addr.client, a_addr.port),
+                queue_id=alsa.snd_seq_query_subscribe_get_queue(query),
+                exclusive=alsa.snd_seq_query_subscribe_get_exclusive(query),
+                time_update=alsa.snd_seq_query_subscribe_get_time_update(query),
+                time_real=alsa.snd_seq_query_subscribe_get_time_real(query),
+                )
+
+    def _to_alsa(self) -> _snd_seq_query_subscribe_t:
+        """Create a an ALSA :alsa:`snd_seq_client_info_t` object from self."""
+        query_p = ffi.new("snd_seq_query_subscribe_t **")
+        err = alsa.snd_seq_query_subscribe_malloc(query_p)
+        _check_alsa_error(err)
+        query = ffi.gc(query_p[0], alsa.snd_seq_query_subscribe_free)
+        alsa.snd_seq_query_subscribe_set_client(query, self.root.client_id)
+        alsa.snd_seq_query_subscribe_set_port(query, self.root.port_id)
+        alsa.snd_seq_query_subscribe_set_type(query, self.type)
+        alsa.snd_seq_query_subscribe_set_index(query, self.index)
+        return query
+
+
 class SequencerClientBase:
     """Base class for :class:`SequencerClient` and :class:`AsyncSequencerClient`.
 
@@ -1019,6 +1114,32 @@ class SequencerClientBase:
         return self._subunsub_port(alsa.snd_seq_unsubscribe_port,
                                    sender, dest)
 
+    def query_port_subscribers(self,
+                               query: SubscriptionQuery
+                               ) -> SubscriptionQuery:
+        """Queries the subscribers subscribers to a port.
+
+        At least, the client id, the port id, the index number and the query
+        type must be set in to perform a proper query. As the query type,
+        :data:`SubscriptionQueryType.READ` or
+        :data:`SubscriptionQueryType.WRITE` can be specified to check whether
+        the readers or the writers to the port. To query the first
+        subscription, set 0 to the index number. To list up all the
+        subscriptions, call this method with the index numbers from 0 until
+        this raises :class:`ALSAError`. Or use :meth:`list_port_subscribers()`
+        instead.
+
+        Wraps :alsa:`snd_seq_query_port_subscribers`.
+
+        :param query: Query parameters
+        """
+        self._check_handle()
+        a_query = query._to_alsa()
+        err = alsa.snd_seq_query_port_subscribers(self.handle, a_query)
+        _check_alsa_error(err)
+        result = SubscriptionQuery._from_alsa(a_query)
+        return result
+
 
 class SequencerClient(SequencerClientBase):
     """ALSA sequencer client connection.
@@ -1362,4 +1483,4 @@ class AsyncSequencerClient(SequencerClientBase):
 
 
 __all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType", "SequencerType",
-           "SystemInfo"]
+           "SystemInfo", "SubscriptionQueryType", "SubscriptionQuery"]

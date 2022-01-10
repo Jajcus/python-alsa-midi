@@ -25,3 +25,10 @@ Ports
 .. autoclass:: PortType
    :members:
    :undoc-members:
+
+.. autoclass:: SubscriptionQuery
+   :members:
+
+.. autoclass:: SubscriptionQueryType
+   :members:
+   :undoc-members:
