@@ -4,8 +4,8 @@ import sys
 
 import pytest
 
-from alsa_midi import (ALSAError, AsyncSequencerClient, ClientInfo, ClientType, SequencerClient,
-                       SequencerType, StateError, SystemInfo, alsa, ffi)
+from alsa_midi import (ALSAError, AsyncSequencerClient, ClientInfo, ClientPool, ClientType,
+                       SequencerClient, SequencerType, StateError, SystemInfo, alsa, ffi)
 from alsa_midi.client import SequencerClientBase
 from alsa_midi.event import EventType, MidiBytesEvent, NoteOffEvent, NoteOnEvent
 
@@ -482,3 +482,29 @@ def test_port_subscribe_unsubscribe(alsa_seq_state):
     finally:
         c2.close()
         c1.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_client_pool():
+    client = SequencerClient("test")
+
+    pool1 = client.get_client_pool()
+    assert isinstance(pool1, ClientPool)
+    assert pool1.client_id == client.client_id
+    assert pool1.output_pool > 0
+    assert pool1.input_pool > 0
+    assert pool1.output_room >= 0 and pool1.output_room <= pool1.output_pool
+    # assert pool1.output_free == pool1.output_pool  # ??
+    assert pool1.input_free > 0 and pool1.input_free <= pool1.input_pool
+
+    pool2 = ClientPool(output_pool=pool1.output_pool * 3,
+                       input_pool=pool1.input_pool * 4,
+                       output_room=pool1.output_pool * 2)
+    client.set_client_pool(pool2)
+
+    pool3 = client.get_client_pool()
+    assert isinstance(pool3, ClientPool)
+    assert pool3.client_id == client.client_id
+    assert pool3.output_pool == pool1.output_pool * 3
+    assert pool3.input_pool == pool1.input_pool * 4
+    assert pool3.output_room == pool1.output_pool * 2

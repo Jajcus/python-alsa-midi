@@ -271,7 +271,7 @@ class SubscriptionQuery:
                 )
 
     def _to_alsa(self) -> _snd_seq_query_subscribe_t:
-        """Create a an ALSA :alsa:`snd_seq_client_info_t` object from self."""
+        """Create a an ALSA :alsa:`snd_seq_query_subscribe_t` object from self."""
         query_p = ffi.new("snd_seq_query_subscribe_t **")
         err = alsa.snd_seq_query_subscribe_malloc(query_p)
         _check_alsa_error(err)
@@ -281,6 +281,68 @@ class SubscriptionQuery:
         alsa.snd_seq_query_subscribe_set_type(query, self.type)
         alsa.snd_seq_query_subscribe_set_index(query, self.index)
         return query
+
+
+_snd_seq_client_pool_t = NewType("_snd_seq_client_pool_t", object)
+
+
+class ClientPool:
+    """Client kernel-side memory pool information.
+
+    Represents data from :alsa:`snd_seq_client_pool_t`
+
+    :ivar client_id: client id
+    :ivar output_pool: output pool size
+    :ivar input_pool: input pool size
+    :ivar output_room: output pool room size
+    :ivar output_free: amount of free space in the output pool
+    :ivar input_free: amount of free space in the input pool
+    """
+    client_id: int
+    output_pool: int
+    input_pool: int
+    output_room: int
+    output_free: int
+    input_free: int
+
+    def __init__(self,
+                 output_pool: int,
+                 input_pool: int,
+                 output_room: int,
+                 *,
+                 client_id: int = 0,
+                 output_free: int = 0,
+                 input_free: int = 0):
+
+        self.client_id = client_id
+        self.output_pool = output_pool
+        self.input_pool = input_pool
+        self.output_room = output_room
+        self.output_free = output_free
+        self.input_free = input_free
+
+    @classmethod
+    def _from_alsa(cls, pool: _snd_seq_client_pool_t):
+        """Create a ClientInfo object from ALSA :alsa:`snd_seq_client_pool_t`."""
+        return cls(
+                client_id=alsa.snd_seq_client_pool_get_client(pool),
+                output_pool=alsa.snd_seq_client_pool_get_output_pool(pool),
+                input_pool=alsa.snd_seq_client_pool_get_input_pool(pool),
+                output_room=alsa.snd_seq_client_pool_get_output_room(pool),
+                output_free=alsa.snd_seq_client_pool_get_output_free(pool),
+                input_free=alsa.snd_seq_client_pool_get_input_free(pool),
+                )
+
+    def _to_alsa(self) -> _snd_seq_client_pool_t:
+        """Create a an ALSA :alsa:`snd_seq_client_pool_t` object from self."""
+        pool_p = ffi.new("snd_seq_client_pool_t **")
+        err = alsa.snd_seq_client_pool_malloc(pool_p)
+        _check_alsa_error(err)
+        pool = ffi.gc(pool_p[0], alsa.snd_seq_client_pool_free)
+        alsa.snd_seq_client_pool_set_output_pool(pool, self.output_pool)
+        alsa.snd_seq_client_pool_set_input_pool(pool, self.input_pool)
+        alsa.snd_seq_client_pool_set_output_room(pool, self.output_room)
+        return pool
 
 
 class SequencerClientBase:
@@ -1180,6 +1242,30 @@ class SequencerClientBase:
                 i += 1
         return result
 
+    def get_client_pool(self) -> ClientPool:
+        """Obtain the pool information of the current client.
+
+        Wraps :alsa:`snd_seq_get_client_pool`.
+        """
+        self._check_handle()
+        pool_p = ffi.new("snd_seq_client_pool_t **")
+        err = alsa.snd_seq_client_pool_malloc(pool_p)
+        _check_alsa_error(err)
+        a_pool = ffi.gc(pool_p[0], alsa.snd_seq_client_pool_free)
+        err = alsa.snd_seq_get_client_pool(self.handle, a_pool)
+        _check_alsa_error(err)
+        return ClientPool._from_alsa(a_pool)
+
+    def set_client_pool(self, pool: ClientPool):
+        """Change pool settings of the current client.
+
+        Wraps :alsa:`snd_seq_set_client_pool`.
+        """
+        self._check_handle()
+        a_pool = pool._to_alsa()
+        err = alsa.snd_seq_set_client_pool(self.handle, a_pool)
+        _check_alsa_error(err)
+
 
 class SequencerClient(SequencerClientBase):
     """ALSA sequencer client connection.
@@ -1523,4 +1609,4 @@ class AsyncSequencerClient(SequencerClientBase):
 
 
 __all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType", "SequencerType",
-           "SystemInfo", "SubscriptionQueryType", "SubscriptionQuery"]
+           "SystemInfo", "SubscriptionQueryType", "SubscriptionQuery", "ClientPool"]

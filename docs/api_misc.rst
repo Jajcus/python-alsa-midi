@@ -11,6 +11,8 @@ Miscelanous objects
 
 .. autoclass:: SystemInfo
 
+.. autoclass:: ClientPool
+
 .. py:data:: alsa
 
    Provides direct access to ALSA library functions (snd_seq_*) as `cffi`_ bindings.
