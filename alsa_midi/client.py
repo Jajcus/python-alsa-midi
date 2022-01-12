@@ -1243,7 +1243,7 @@ class SequencerClientBase:
         return result
 
     def get_client_pool(self) -> ClientPool:
-        """Obtain the pool information of the current client.
+        """Obtain the pool information of the client.
 
         Wraps :alsa:`snd_seq_get_client_pool`.
         """
@@ -1257,13 +1257,45 @@ class SequencerClientBase:
         return ClientPool._from_alsa(a_pool)
 
     def set_client_pool(self, pool: ClientPool):
-        """Change pool settings of the current client.
+        """Change pool settings of the client.
+
+        :param pool: new pool settings
 
         Wraps :alsa:`snd_seq_set_client_pool`.
         """
         self._check_handle()
         a_pool = pool._to_alsa()
         err = alsa.snd_seq_set_client_pool(self.handle, a_pool)
+        _check_alsa_error(err)
+
+    def set_client_pool_output(self, size: int):
+        """Change output pool size for the client.
+
+        :param size: requested pool size
+
+        Wraps :alsa:`snd_seq_set_client_pool_output`
+        """
+        err = alsa.snd_seq_set_client_pool_output(self.handle, size)
+        _check_alsa_error(err)
+
+    def set_client_pool_output_room(self, size: int):
+        """Change output pool room size for the client.
+
+        :param size: requested room size
+
+        Wraps :alsa:`snd_seq_set_client_pool_output_room`
+        """
+        err = alsa.snd_seq_set_client_pool_output_room(self.handle, size)
+        _check_alsa_error(err)
+
+    def set_client_pool_input(self, size: int):
+        """Change input pool size for the client.
+
+        :param size: requested pool size
+
+        Wraps :alsa:`snd_seq_set_client_pool_input`
+        """
+        err = alsa.snd_seq_set_client_pool_input(self.handle, size)
         _check_alsa_error(err)
 
 

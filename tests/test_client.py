@@ -508,3 +508,42 @@ def test_client_pool():
     assert pool3.output_pool == pool1.output_pool * 3
     assert pool3.input_pool == pool1.input_pool * 4
     assert pool3.output_room == pool1.output_pool * 2
+
+
+@pytest.mark.require_alsa_seq
+def test_set_client_pool_output():
+    client = SequencerClient("test")
+
+    client.set_client_pool_output(100)
+    pool = client.get_client_pool()
+    assert pool.output_pool == 100
+
+    client.set_client_pool_output(200)
+    pool = client.get_client_pool()
+    assert pool.output_pool == 200
+
+
+@pytest.mark.require_alsa_seq
+def test_set_client_pool_output_room():
+    client = SequencerClient("test")
+
+    client.set_client_pool_output_room(100)
+    pool = client.get_client_pool()
+    assert pool.output_room == 100
+
+    client.set_client_pool_output_room(200)
+    pool = client.get_client_pool()
+    assert pool.output_room == 200
+
+
+@pytest.mark.require_alsa_seq
+def test_set_client_pool_input():
+    client = SequencerClient("test")
+
+    client.set_client_pool_input(100)
+    pool = client.get_client_pool()
+    assert pool.input_pool == 100
+
+    client.set_client_pool_input(200)
+    pool = client.get_client_pool()
+    assert pool.input_pool == 200
