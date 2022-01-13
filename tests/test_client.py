@@ -353,6 +353,27 @@ def test_get_client_info(alsa_seq_state):
 
 
 @pytest.mark.require_alsa_seq
+def test_set_client_info(alsa_seq_state):
+    client = SequencerClient("test")
+    alsa_seq_state.load()
+
+    info = ClientInfo(client_id=0,
+                      name="new name",
+                      broadcast_filter=True,
+                      error_bounce=True)
+
+    client.set_client_info(info)
+
+    info = client.get_client_info()
+    assert isinstance(info, ClientInfo)
+    assert info.name == "new name"
+    assert info.broadcast_filter is True
+    assert info.error_bounce is True
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
 def test_get_system_info(alsa_seq_state):
     client = SequencerClient("test")
     alsa_seq_state.load()

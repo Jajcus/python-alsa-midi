@@ -865,6 +865,18 @@ class SequencerClientBase:
         result = ClientInfo._from_alsa(info)
         return result
 
+    def set_client_info(self, info: ClientInfo):
+        """Set client information including event filter.
+
+        Wraps :alsa:`snd_seq_set_client_info`.
+
+        :param info: new client info
+        """
+        self._check_handle()
+        a_info = info._to_alsa()
+        err = alsa.snd_seq_set_client_info(self.handle, a_info)
+        _check_alsa_error(err)
+
     @overload
     def query_next_client(self, previous: ClientInfo) -> Optional[ClientInfo]:
         ...
