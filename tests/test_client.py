@@ -334,7 +334,7 @@ def test_client_info():
 
 
 @pytest.mark.require_alsa_seq
-def test_get_system_info(alsa_seq_state):
+def test_get_client_info(alsa_seq_state):
     client = SequencerClient("test")
     alsa_seq_state.load()
 
@@ -353,7 +353,7 @@ def test_get_system_info(alsa_seq_state):
 
 
 @pytest.mark.require_alsa_seq
-def test_get_client_info(alsa_seq_state):
+def test_get_system_info(alsa_seq_state):
     client = SequencerClient("test")
     alsa_seq_state.load()
 
