@@ -276,6 +276,7 @@ def test_client_info():
     assert info.pid is None
     assert info.num_ports == 0
     assert info.event_lost == 0
+    assert info.event_filter is None
 
     # test initializing all attributes
     info = ClientInfo(client_id=15,
@@ -286,7 +287,8 @@ def test_client_info():
                       card_id=8,
                       pid=100,
                       num_ports=5,
-                      event_lost=7)
+                      event_lost=7,
+                      event_filter={EventType.NOTEON, EventType.NOTEOFF})
 
     assert info.client_id == 15
     assert info.name == "client_info_test2"
@@ -297,6 +299,7 @@ def test_client_info():
     assert info.pid == 100
     assert info.num_ports == 5
     assert info.event_lost == 7
+    assert info.event_filter == {EventType.NOTEON, EventType.NOTEOFF}
 
     # test _to_alsa (only some values are writable to the ALSA struct)
     info = ClientInfo(client_id=17,
@@ -314,6 +317,19 @@ def test_client_info():
     assert ffi.string(alsa.snd_seq_client_info_get_name(alsa_info)) == b"client_info_test3"
     assert alsa.snd_seq_client_info_get_broadcast_filter(alsa_info) == 1
     assert alsa.snd_seq_client_info_get_error_bounce(alsa_info) == 0
+    assert alsa.snd_seq_client_info_get_event_filter(alsa_info) == ffi.NULL
+
+    # test _to_alsa with event filter
+    info = ClientInfo(client_id=17,
+                      name="xxx",
+                      event_filter={EventType.NOTEON, EventType.NOTEOFF})
+    assert info.event_filter == {EventType.NOTEON, EventType.NOTEOFF}
+
+    alsa_info = info._to_alsa()
+    assert alsa.snd_seq_client_info_get_event_filter(alsa_info) != ffi.NULL
+    assert alsa.snd_seq_client_info_event_filter_check(alsa_info, EventType.NOTEON)
+    assert alsa.snd_seq_client_info_event_filter_check(alsa_info, EventType.NOTEOFF)
+    assert not alsa.snd_seq_client_info_event_filter_check(alsa_info, EventType.CONTROLLER)
 
     # test _from_alsa (only the attributes we can set)
     info_p = ffi.new("snd_seq_client_info_t **")
@@ -331,6 +347,18 @@ def test_client_info():
     assert info.broadcast_filter is True
     assert info.error_bounce is True
     assert info.type == ClientType._UNSET
+    assert info.event_filter is None
+
+    # test _from_alsa with filter
+    info_p = ffi.new("snd_seq_client_info_t **")
+    err = alsa.snd_seq_client_info_malloc(info_p)
+    assert err >= 0
+    alsa_info = ffi.gc(info_p[0], alsa.snd_seq_client_info_free)
+    alsa.snd_seq_client_info_event_filter_add(alsa_info, EventType.NOTEON)
+    alsa.snd_seq_client_info_event_filter_add(alsa_info, EventType.CONTROLLER)
+    info = ClientInfo._from_alsa(alsa_info)
+
+    assert info.event_filter == {EventType.NOTEON, EventType.CONTROLLER}
 
 
 @pytest.mark.require_alsa_seq
@@ -369,6 +397,22 @@ def test_set_client_info(alsa_seq_state):
     assert info.name == "new name"
     assert info.broadcast_filter is True
     assert info.error_bounce is True
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_set_client_event_filter():
+    client = SequencerClient("test")
+
+    info = client.get_client_info()
+    assert info.event_filter is None
+
+    client.set_client_event_filter(EventType.NOTEON)
+    client.set_client_event_filter(EventType.NOTEOFF)
+
+    info = client.get_client_info()
+    assert info.event_filter == {EventType.NOTEON, EventType.NOTEOFF}
 
     client.close()
 

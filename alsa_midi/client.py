@@ -6,7 +6,7 @@ import time
 from collections import namedtuple
 from enum import IntEnum, IntFlag
 from functools import partial
-from typing import Any, Callable, List, NewType, Optional, Tuple, Union, overload
+from typing import Any, Callable, List, NewType, Optional, Set, Tuple, Union, overload
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -87,6 +87,7 @@ class ClientInfo:
     pid: Optional[int]
     num_ports: int
     event_lost: int
+    event_filter: Optional[Set[EventType]]
 
     def __init__(self,
                  client_id: int,
@@ -97,7 +98,8 @@ class ClientInfo:
                  card_id: Optional[int] = None,
                  pid: Optional[int] = None,
                  num_ports: int = 0,
-                 event_lost: int = 0):
+                 event_lost: int = 0,
+                 event_filter: Optional[Set[EventType]] = None):
         self.client_id = client_id
         self.name = name
         self.broadcast_filter = broadcast_filter
@@ -107,6 +109,7 @@ class ClientInfo:
         self.pid = pid
         self.num_ports = num_ports
         self.event_lost = event_lost
+        self.event_filter = event_filter
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_client_info_t):
@@ -126,6 +129,18 @@ class ClientInfo:
         except AttributeError:
             pid = None
         name = ffi.string(alsa.snd_seq_client_info_get_name(info))
+
+        # deprecated but seems the only way to check if there is a filter
+        has_filter = bool(alsa.snd_seq_client_info_get_event_filter(info))
+        if has_filter:
+            event_filter = set()
+            for e_type in EventType:
+                if e_type == EventType.NONE:
+                    continue
+                if alsa.snd_seq_client_info_event_filter_check(info, e_type):
+                    event_filter.add(e_type)
+        else:
+            event_filter = None
         return cls(
                 client_id=alsa.snd_seq_client_info_get_client(info),
                 name=name.decode(),
@@ -136,6 +151,7 @@ class ClientInfo:
                 pid=pid,
                 num_ports=alsa.snd_seq_client_info_get_num_ports(info),
                 event_lost=alsa.snd_seq_client_info_get_event_lost(info),
+                event_filter=event_filter,
                 )
 
     def _to_alsa(self) -> _snd_seq_client_info_t:
@@ -148,6 +164,11 @@ class ClientInfo:
         alsa.snd_seq_client_info_set_name(info, self.name.encode())
         alsa.snd_seq_client_info_set_broadcast_filter(info, 1 if self.broadcast_filter else 0)
         alsa.snd_seq_client_info_set_error_bounce(info, 1 if self.error_bounce else 0)
+        if self.event_filter:
+            for e_type in self.event_filter:
+                alsa.snd_seq_client_info_event_filter_add(info, e_type)
+        else:
+            alsa.snd_seq_client_info_event_filter_clear(info)
         return info
 
 
@@ -875,6 +896,17 @@ class SequencerClientBase:
         self._check_handle()
         a_info = info._to_alsa()
         err = alsa.snd_seq_set_client_info(self.handle, a_info)
+        _check_alsa_error(err)
+
+    def set_client_event_filter(self, event_type: EventType):
+        """Add an event to client's event filter.
+
+        Wraps :alsa:`snd_seq_set_client_event_filter`.
+
+        :param event_type: event type to accept
+        """
+        self._check_handle()
+        err = alsa.snd_seq_set_client_event_filter(self.handle, int(event_type))
         _check_alsa_error(err)
 
     @overload

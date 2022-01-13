@@ -2,7 +2,15 @@
 
 from argparse import ArgumentParser
 
-from alsa_midi import WRITE_PORT, Address, SequencerClient
+from alsa_midi import WRITE_PORT, Address, EventType, SequencerClient
+
+
+def event_type(value):
+    value = value.upper()
+    try:
+        return getattr(EventType, value)
+    except AttributeError:
+        raise ValueError("Invalid event type")
 
 
 def main():
@@ -11,6 +19,8 @@ def main():
                         help="Force timestamps in seconds")
     parser.add_argument("--port", "-p", type=Address, action="append",
                         help="Connect to the specific port")
+    parser.add_argument("--filter", "-f", type=event_type, action="append",
+                        help="Event type to allow")
 
     args = parser.parse_args()
 
@@ -20,6 +30,10 @@ def main():
         queue = client.create_queue()
     else:
         queue = None
+
+    if args.filter:
+        for e_type in args.filter:
+            client.set_client_event_filter(e_type)
 
     port = client.create_port("input", WRITE_PORT,
                               timestamping=args.real_time,
