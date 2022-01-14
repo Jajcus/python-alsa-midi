@@ -15,7 +15,7 @@ from .exceptions import StateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
                    WRITE_PORT_PREFERRED_TYPES, Port, PortCaps, PortInfo, PortType,
                    get_port_info_sort_key)
-from .queue import Queue
+from .queue import Queue, QueueInfo
 from .util import _check_alsa_error
 
 _snd_seq_t = NewType("_snd_seq_t", object)
@@ -973,8 +973,6 @@ class SequencerClientBase:
         """Set information about a specific own port.
 
         Wraps :alsa:`snd_seq_set_port_info`.
-
-        :return: port information
         """
         if isinstance(port, int):
             port_id = port
@@ -1340,6 +1338,37 @@ class SequencerClientBase:
         Wraps :alsa:`snd_seq_set_client_pool_input`
         """
         err = alsa.snd_seq_set_client_pool_input(self.handle, size)
+        _check_alsa_error(err)
+
+    def get_queue_info(self, queue_id: int) -> QueueInfo:
+        """Obtain queue attributes.
+
+        Wraps :alsa:`snd_seq_get_queue_info`.
+
+        :param queue_id: identifier of the queue
+
+        :return: queue information
+        """
+        self._check_handle()
+        info_p = ffi.new("snd_seq_queue_info_t **")
+        err = alsa.snd_seq_queue_info_malloc(info_p)
+        _check_alsa_error(err)
+        info = ffi.gc(info_p[0], alsa.snd_seq_queue_info_free)
+        err = alsa.snd_seq_get_queue_info(self.handle, queue_id, info)
+        _check_alsa_error(err)
+        result = QueueInfo._from_alsa(info)
+        return result
+
+    def set_queue_info(self, queue_id: int, info: QueueInfo):
+        """Change queue attributes.
+
+        :param queue_id: identifier of the queue
+
+        Wraps :alsa:`snd_seq_set_queue_info`.
+        """
+        self._check_handle()
+        alsa_info = info._to_alsa(client_id=self.client_id)
+        err = alsa.snd_seq_set_queue_info(self.handle, queue_id, alsa_info)
         _check_alsa_error(err)
 
 

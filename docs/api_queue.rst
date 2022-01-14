@@ -5,3 +5,6 @@ Queues
 
 .. autoclass:: Queue
    :members:
+
+.. autoclass:: QueueInfo
+   :members:
