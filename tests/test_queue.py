@@ -88,6 +88,23 @@ def test_queue_create_named_alsa(alsa_seq_state):
 
 
 @pytest.mark.require_alsa_seq
+def test_queue_create_info(alsa_seq_state):
+    client = SequencerClient("test_c")
+
+    info = QueueInfo(name="queue name")
+    queue = client.create_queue(info=info)
+
+    alsa_seq_state.load()
+    assert queue.queue_id in alsa_seq_state.queues
+    alsa_queue = alsa_seq_state.queues[queue.queue_id]
+
+    assert alsa_queue.client_id == client.client_id
+    assert alsa_queue.name == "queue name"
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
 def test_queue_info(alsa_seq_state):
     client1 = SequencerClient("test_c1")
     client2 = SequencerClient("test_c2")

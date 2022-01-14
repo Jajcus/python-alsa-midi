@@ -572,17 +572,24 @@ class SequencerClientBase:
         _check_alsa_error(port)
         return Port(self, port)
 
-    def create_queue(self, name: str = None) -> Queue:
+    def create_queue(self, name: str = None, info: QueueInfo = None) -> Queue:
         """Create a new queue.
 
-        Wraps :alsa:`snd_seq_alloc_named_queue` or :alsa:`snd_seq_alloc_queue`.
+        Wraps :alsa:`snd_seq_create_queue`, :alsa:`snd_seq_alloc_named_queue`
+        or :alsa:`snd_seq_alloc_queue`.
 
         :param name: queue name
+        :param info: queue creation parameters
 
         :return: queue object created.
         """
         self._check_handle()
-        if name is not None:
+        if info is not None:
+            if name is not None:
+                raise ValueError("'name' and 'info' cannot be both provided")
+            alsa_info = info._to_alsa(client_id=self.client_id)
+            queue = alsa.snd_seq_create_queue(self.handle, alsa_info)
+        elif name is not None:
             queue = alsa.snd_seq_alloc_named_queue(self.handle, name.encode("utf-8"))
         else:
             queue = alsa.snd_seq_alloc_queue(self.handle)
