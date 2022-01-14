@@ -1378,19 +1378,19 @@ class SequencerClientBase:
         err = alsa.snd_seq_set_queue_info(self.handle, queue_id, alsa_info)
         _check_alsa_error(err)
 
-    def query_named_queue(self, name: str) -> int:
+    def query_named_queue(self, name: str) -> Queue:
         """Query queue by name.
 
         Wraps :alsa:`snd_seq_query_named_queue`.
 
         :param name: queue name
 
-        :return: queue identifier.
+        :return: queue by the provided name
         """
         self._check_handle()
         queue_id = alsa.snd_seq_query_named_queue(self.handle, name.encode("utf-8"))
         _check_alsa_error(queue_id)
-        return queue_id
+        return Queue(self, queue_id)
 
 
 class SequencerClient(SequencerClientBase):

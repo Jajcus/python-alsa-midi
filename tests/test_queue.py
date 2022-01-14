@@ -151,14 +151,14 @@ def test_query_named_queue():
     queue1 = client1.create_queue("c1 queue")
     queue2 = client2.create_queue("c2 queue")
 
-    queue_id = client1.query_named_queue("c2 queue")
-    assert queue_id == queue2.queue_id
+    queue = client1.query_named_queue("c2 queue")
+    assert queue.queue_id == queue2.queue_id
 
-    queue_id = client2.query_named_queue("c1 queue")
-    assert queue_id == queue1.queue_id
+    queue = client2.query_named_queue("c1 queue")
+    assert queue.queue_id == queue1.queue_id
 
     with pytest.raises(ALSAError) as exc:
-        queue_id = client1.query_named_queue("no such queue")
+        client1.query_named_queue("no such queue")
     assert exc.value.errnum == -errno.EINVAL
 
     client1.close()
