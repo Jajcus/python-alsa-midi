@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 
-from alsa_midi import WRITE_PORT, Address, EventType, SequencerClient
+from alsa_midi import WRITE_PORT, Address, Event, EventType, SequencerClient
+
+EVENT_NAMES = {t.name.lower(): t for t in EventType if t != EventType.NONE}
+ALL_EVENT_NAMES = {k.replace("_", ""): v for k, v in EVENT_NAMES.items()}
+ALL_EVENT_NAMES.update({v.__name__.replace("Event", "").lower(): k
+                        for k, v in Event._specialized.items()})
 
 
 def event_type(value):
-    value = value.upper()
     try:
-        return getattr(EventType, value)
-    except AttributeError:
-        raise ValueError("Invalid event type")
+        int_value = int(value)
+        return EventType(int_value)
+    except ValueError:
+        pass
+    value = value.lower().replace("_", "").replace(" ", "").replace("event", "")
+    try:
+        return ALL_EVENT_NAMES[value]
+    except KeyError:
+        raise ArgumentTypeError("Invalid event type. Valid options: " + ",".join(EVENT_NAMES))
 
 
 def main():
