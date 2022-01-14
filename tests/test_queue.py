@@ -142,3 +142,24 @@ def test_queue_info(alsa_seq_state):
 
     client1.close()
     client2.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_query_named_queue():
+    client1 = SequencerClient("test_c1")
+    client2 = SequencerClient("test_c2")
+    queue1 = client1.create_queue("c1 queue")
+    queue2 = client2.create_queue("c2 queue")
+
+    queue_id = client1.query_named_queue("c2 queue")
+    assert queue_id == queue2.queue_id
+
+    queue_id = client2.query_named_queue("c1 queue")
+    assert queue_id == queue1.queue_id
+
+    with pytest.raises(ALSAError) as exc:
+        queue_id = client1.query_named_queue("no such queue")
+    assert exc.value.errnum == -errno.EINVAL
+
+    client1.close()
+    client2.close()
