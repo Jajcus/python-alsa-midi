@@ -163,3 +163,27 @@ def test_query_named_queue():
 
     client1.close()
     client2.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_usage():
+    client1 = SequencerClient("test_c1")
+    client2 = SequencerClient("test_c2")
+    queue1 = client1.create_queue("c1 queue")
+
+    assert queue1.get_usage() is True
+
+    queue1_c2 = Queue(client2, queue1.queue_id)
+
+    assert queue1_c2.get_usage() is False
+
+    queue1_c2.set_usage(True)
+
+    assert queue1_c2.get_usage() is True
+
+    queue1_c2.set_usage(False)
+
+    assert queue1_c2.get_usage() is False
+
+    client1.close()
+    client2.close()

@@ -196,5 +196,27 @@ class Queue:
             raise StateError("Already closed")
         return self.client.set_queue_info(self.queue_id, info)
 
+    def get_usage(self) -> bool:
+        """Get the queue usage flag.
+
+        Wraps :alsa:`snd_seq_get_queue_usage`.
+
+        :return: `True` if the queue is considered in use by the current client."""
+        handle = self._get_client_handle()
+        result = alsa.snd_seq_get_queue_usage(handle, self.queue_id)
+        _check_alsa_error(result)
+        return bool(result)
+
+    def set_usage(self, usage: bool):
+        """Marks the queue in use by the current client.
+
+        Wraps :alsa:`snd_seq_set_queue_usage`.
+
+        :param usage: True to enable queue usage
+        """
+        handle = self._get_client_handle()
+        err = alsa.snd_seq_set_queue_usage(handle, self.queue_id, int(usage))
+        _check_alsa_error(err)
+
 
 __all__ = ["Queue", "QueueInfo"]
