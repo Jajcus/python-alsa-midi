@@ -187,3 +187,117 @@ def test_usage():
 
     client1.close()
     client2.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_ownership(alsa_seq_state):
+    client1 = SequencerClient("test_c1")
+    client2 = SequencerClient("test_c2")
+    queue1 = client1.create_queue("c1 queue1")
+    queue2 = client1.create_queue("c1 queue2")
+    queue3 = client2.create_queue("c2 queue3")
+
+    assert queue1._own is True
+    assert queue2._own is True
+    assert queue3._own is True
+
+    alsa_seq_state.load()
+    assert queue1.queue_id in alsa_seq_state.queues
+    assert queue2.queue_id in alsa_seq_state.queues
+    assert queue3.queue_id in alsa_seq_state.queues
+
+    queue1_c1 = client1.get_queue(queue1.queue_id)
+    assert queue1_c1 is queue1
+    assert queue1_c1._own is True
+    assert queue1_c1.get_usage() is True
+
+    queue1_c2 = client2.get_queue(queue1.queue_id)
+    assert queue1_c2 is not queue1
+    assert queue1_c2.queue_id == queue1.queue_id
+    assert queue1_c2._own is False
+    assert queue1_c2.get_usage() is True
+
+    queue2_c1 = client1.query_named_queue("c1 queue2")
+    assert queue2_c1 is queue2
+    assert queue2_c1._own is True
+    assert queue2_c1.get_usage() is True
+
+    queue2_c2 = client2.query_named_queue("c1 queue2")
+    assert queue2_c2 is not queue2
+    assert queue2_c2.queue_id == queue2.queue_id
+    assert queue2_c2._own is False
+    assert queue2_c2.get_usage() is True
+
+    queue2_c1_not_managed = Queue(client1, queue2.queue_id)
+    assert queue2_c1_not_managed is not queue2
+    assert queue2_c1_not_managed._own is None
+    assert queue2_c2.get_usage() is True
+
+    queue2_c2_not_managed = Queue(client2, queue2.queue_id)
+    assert queue2_c2_not_managed is not queue2
+    assert queue2_c2_not_managed.queue_id == queue2.queue_id
+    assert queue2_c2_not_managed._own is None
+    assert queue2_c2.get_usage() is True
+
+    queue3_c1_not_managed = Queue(client1, queue3.queue_id)
+    assert queue3_c1_not_managed is not queue3
+    assert queue3_c1_not_managed._own is None
+    assert queue3_c1_not_managed.get_usage() is False
+
+    queue3_c2_not_managed = Queue(client2, queue3.queue_id)
+    assert queue3_c2_not_managed is not queue3
+    assert queue3_c2_not_managed.queue_id == queue3.queue_id
+    assert queue3_c2_not_managed._own is None
+    assert queue3_c2_not_managed.get_usage() is True
+
+    # should not affect the queues
+    queue3_c1_not_managed.close()
+    del queue3_c2_not_managed
+    alsa_seq_state.load()
+    assert queue1.queue_id in alsa_seq_state.queues
+    assert queue2.queue_id in alsa_seq_state.queues
+    assert queue3.queue_id in alsa_seq_state.queues
+
+    # destroys queue3
+    queue3.close()
+    alsa_seq_state.load()
+    assert queue1.queue_id in alsa_seq_state.queues
+    assert queue2.queue_id in alsa_seq_state.queues
+
+    # no queue deleted
+    del queue2_c1_not_managed
+    alsa_seq_state.load()
+    assert queue1.queue_id in alsa_seq_state.queues
+    assert queue2.queue_id in alsa_seq_state.queues
+
+    # still no queue deleted - reference held by queue2_c1
+    queue2_id = queue2.queue_id
+    del queue2
+    alsa_seq_state.load()
+    assert queue1.queue_id in alsa_seq_state.queues
+    assert queue2_id in alsa_seq_state.queues
+
+    # finally deleted - no more references
+    del queue2_c1
+    alsa_seq_state.load()
+    assert queue1.queue_id in alsa_seq_state.queues
+    assert queue2_id not in alsa_seq_state.queues
+
+    # queue2_c2 now points to deleted queue
+    with pytest.raises(ALSAError):
+        queue2_c2.get_info()
+
+    queue2_c2.close()
+
+    # not deleting – it is owned by c1
+    queue1_c2.close()
+    alsa_seq_state.load()
+    assert queue1.queue_id in alsa_seq_state.queues
+
+    # now delete
+    queue1.close()
+    alsa_seq_state.load()
+    assert queue1.queue_id not in alsa_seq_state.queues
+
+    client1.close()
+    client2.close()

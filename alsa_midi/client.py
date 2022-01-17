@@ -6,7 +6,9 @@ import time
 from collections import namedtuple
 from enum import IntEnum, IntFlag
 from functools import partial
-from typing import Any, Callable, List, NewType, Optional, Set, Tuple, Union, overload
+from typing import (Any, Callable, List, MutableMapping, NewType, Optional, Set, Tuple, Union,
+                    overload)
+from weakref import WeakValueDictionary
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -383,6 +385,7 @@ class SequencerClientBase:
     _handle_p: _snd_seq_t_p
     _fd: int = -1
     _event_parser: Optional[_snd_midi_event_t] = None
+    _queues: MutableMapping[int, Queue]
 
     def __init__(
             self,
@@ -390,7 +393,7 @@ class SequencerClientBase:
             streams: int = StreamOpenType.DUPLEX,
             mode: int = OpenMode.NONBLOCK,
             sequencer_name: str = "default"):
-
+        self._queues = WeakValueDictionary()
         client_name_b = client_name.encode("utf-8")
         sequencer_name_b = sequencer_name.encode("utf-8")
         self._handle_p = ffi.new("snd_seq_t **", ffi.NULL)
@@ -594,7 +597,23 @@ class SequencerClientBase:
         else:
             queue = alsa.snd_seq_alloc_queue(self.handle)
         _check_alsa_error(queue)
-        return Queue(self, queue)
+        assert queue not in self._queues
+        result = Queue(self, queue, _own=True)
+        self._queues[queue] = result
+        return result
+
+    def get_queue(self, queue_id: int) -> Queue:
+        """Get a queue object by id.
+
+        :return: queue with a provided name
+        """
+        self._check_handle()
+        queue = self._queues.get(queue_id)
+        if queue is None:
+            err = alsa.snd_seq_set_queue_usage(self.handle, queue_id, 1)
+            _check_alsa_error(err)
+            queue = Queue(self, queue_id, _own=False)
+        return queue
 
     def drop_input(self):
         """Remove all incoming events in the input buffer and sequencer queue.
@@ -1390,7 +1409,12 @@ class SequencerClientBase:
         self._check_handle()
         queue_id = alsa.snd_seq_query_named_queue(self.handle, name.encode("utf-8"))
         _check_alsa_error(queue_id)
-        return Queue(self, queue_id)
+        queue = self._queues.get(queue_id)
+        if queue is None:
+            err = alsa.snd_seq_set_queue_usage(self.handle, queue_id, 1)
+            _check_alsa_error(err)
+            queue = Queue(self, queue_id, _own=False)
+        return queue
 
 
 class SequencerClient(SequencerClientBase):

@@ -83,14 +83,19 @@ class Queue:
 
     :ivar client: client object this queue belongs to
     :ivar queue_id: queue identifier
+    :ivar _own: Ownership flag. `True` for queues owned by the client, `False`
+    for queues owned by other client and `None` for no ownership management (no
+    release or free on close).
     """
 
     client: Optional['SequencerClientBase']
     queue_id: int
+    _own: Optional[bool]
 
-    def __init__(self, client: 'SequencerClientBase', queue_id: int):
+    def __init__(self, client: 'SequencerClientBase', queue_id: int, *, _own: bool = None):
         self.client = client
         self.queue_id = queue_id
+        self._own = _own
 
     def __del__(self):
         try:
@@ -114,11 +119,16 @@ class Queue:
             return
         handle = self.client.handle
         queue = self.queue_id
+        own = self._own
         self.queue_id = None  # type: ignore
+        self._own = False
         self.client = None
-        if handle:
-            err = alsa.snd_seq_free_queue(handle, queue)
-            _check_alsa_error(err)
+        if handle and own is not None:
+            if own:
+                err = alsa.snd_seq_free_queue(handle, queue)
+                _check_alsa_error(err)
+            else:
+                alsa.snd_seq_set_queue_usage(handle, queue, 0)
 
     def set_tempo(self, tempo: int = 500000, ppq: int = 96):
         """Set the tempo of the queue.
@@ -211,6 +221,9 @@ class Queue:
         """Marks the queue in use by the current client.
 
         Wraps :alsa:`snd_seq_set_queue_usage`.
+
+        This flag is normally automatically managed for :class:`Queue` objects
+        obtained via :class:`SequencerClient`.
 
         :param usage: True to enable queue usage
         """
