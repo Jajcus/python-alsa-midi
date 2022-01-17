@@ -605,6 +605,8 @@ class SequencerClientBase:
     def get_queue(self, queue_id: int) -> Queue:
         """Get a queue object by id.
 
+        Wraps :alsa:`snd_seq_set_queue_usage` when a new object is returned.
+
         :return: queue with a provided name
         """
         self._check_handle()
@@ -614,6 +616,18 @@ class SequencerClientBase:
             _check_alsa_error(err)
             queue = Queue(self, queue_id, _own=False)
         return queue
+
+    def get_named_queue(self, name: str) -> Queue:
+        """Get a queue object by name.
+
+        Wraps :alsa:`snd_seq_query_named_queue` and :alsa:`snd_seq_set_queue_usage`.
+
+        :param name: queue name
+
+        :return: queue by the provided name
+        """
+        queue_id = self.query_named_queue(name)
+        return self.get_queue(queue_id)
 
     def drop_input(self):
         """Remove all incoming events in the input buffer and sequencer queue.
@@ -1397,24 +1411,19 @@ class SequencerClientBase:
         err = alsa.snd_seq_set_queue_info(self.handle, queue_id, alsa_info)
         _check_alsa_error(err)
 
-    def query_named_queue(self, name: str) -> Queue:
+    def query_named_queue(self, name: str) -> int:
         """Query queue by name.
 
         Wraps :alsa:`snd_seq_query_named_queue`.
 
         :param name: queue name
 
-        :return: queue by the provided name
+        :return: queue id
         """
         self._check_handle()
         queue_id = alsa.snd_seq_query_named_queue(self.handle, name.encode("utf-8"))
         _check_alsa_error(queue_id)
-        queue = self._queues.get(queue_id)
-        if queue is None:
-            err = alsa.snd_seq_set_queue_usage(self.handle, queue_id, 1)
-            _check_alsa_error(err)
-            queue = Queue(self, queue_id, _own=False)
-        return queue
+        return queue_id
 
 
 class SequencerClient(SequencerClientBase):

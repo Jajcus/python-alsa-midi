@@ -151,11 +151,11 @@ def test_query_named_queue():
     queue1 = client1.create_queue("c1 queue")
     queue2 = client2.create_queue("c2 queue")
 
-    queue = client1.query_named_queue("c2 queue")
-    assert queue.queue_id == queue2.queue_id
+    queue_id = client1.query_named_queue("c2 queue")
+    assert queue_id == queue2.queue_id
 
-    queue = client2.query_named_queue("c1 queue")
-    assert queue.queue_id == queue1.queue_id
+    queue_id = client2.query_named_queue("c1 queue")
+    assert queue_id == queue1.queue_id
 
     with pytest.raises(ALSAError) as exc:
         client1.query_named_queue("no such queue")
@@ -217,12 +217,12 @@ def test_ownership(alsa_seq_state):
     assert queue1_c2._own is False
     assert queue1_c2.get_usage() is True
 
-    queue2_c1 = client1.query_named_queue("c1 queue2")
+    queue2_c1 = client1.get_named_queue("c1 queue2")
     assert queue2_c1 is queue2
     assert queue2_c1._own is True
     assert queue2_c1.get_usage() is True
 
-    queue2_c2 = client2.query_named_queue("c1 queue2")
+    queue2_c2 = client2.get_named_queue("c1 queue2")
     assert queue2_c2 is not queue2
     assert queue2_c2.queue_id == queue2.queue_id
     assert queue2_c2._own is False
