@@ -8,3 +8,6 @@ Queues
 
 .. autoclass:: QueueInfo
    :members:
+
+.. autoclass:: QueueStatus
+   :members:

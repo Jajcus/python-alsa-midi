@@ -1,8 +1,9 @@
 
+from collections import namedtuple
 from typing import TYPE_CHECKING, NewType, Optional
 
 from ._ffi import alsa, ffi
-from .event import EventType
+from .event import EventType, RealTime
 from .exceptions import Error, StateError
 from .util import _check_alsa_error
 
@@ -76,6 +77,46 @@ class QueueInfo:
         alsa.snd_seq_queue_info_set_locked(info, int(self.locked))
         alsa.snd_seq_queue_info_set_flags(info, self.flags)
         return info
+
+
+_snd_seq_queue_status_t = NewType("_snd_seq_queue_status_t", object)
+
+
+class QueueStatus(namedtuple("QueueStatus", "queue_id events tick_time real_time status")):
+    """Queue status.
+
+    Represents data from :alsa:`snd_seq_queue_status_t`
+
+    :ivar queue_id: queue id
+    :ivar events: number of events
+    :ivar tick_time: queue time in ticks
+    :ivar real_time: queue time in seconds and nanoseconds
+    :ivar status: running status bits
+    """
+    queue_id: int
+    events: int
+    tick_time: int
+    real_time: RealTime
+    status: int
+
+    __slots__ = ()
+
+    @classmethod
+    def _from_alsa(cls, info: _snd_seq_queue_status_t):
+        """Create a ClientInfo object from ALSA :alsa:`snd_seq_system_info_t`."""
+        real_time = alsa.snd_seq_queue_status_get_real_time(info)
+        return cls(
+                queue_id=alsa.snd_seq_queue_status_get_queue(info),
+                events=alsa.snd_seq_queue_status_get_events(info),
+                tick_time=alsa.snd_seq_queue_status_get_tick_time(info),
+                real_time=RealTime(real_time.tv_sec, real_time.tv_nsec),
+                status=alsa.snd_seq_queue_status_get_status(info),
+                )
+
+    @property
+    def running(self):
+        """Whether the queue is running."""
+        return bool(self.status & 1)
 
 
 class Queue:
@@ -231,5 +272,14 @@ class Queue:
         err = alsa.snd_seq_set_queue_usage(handle, self.queue_id, int(usage))
         _check_alsa_error(err)
 
+    def get_status(self) -> QueueStatus:
+        """Obtain queue attributes.
 
-__all__ = ["Queue", "QueueInfo"]
+        Wraps :alsa:`snd_seq_get_queue_status`."""
+
+        if self.client is None or self.queue_id is None:
+            raise StateError("Already closed")
+        return self.client.get_queue_status(self.queue_id)
+
+
+__all__ = ["Queue", "QueueInfo", "QueueStatus"]

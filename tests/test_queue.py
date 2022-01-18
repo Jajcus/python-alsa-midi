@@ -1,5 +1,6 @@
 
 import errno
+import time
 
 import pytest
 
@@ -298,6 +299,39 @@ def test_ownership(alsa_seq_state):
     queue1.close()
     alsa_seq_state.load()
     assert queue1.queue_id not in alsa_seq_state.queues
+
+    client1.close()
+    client2.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_queue_status():
+    client1 = SequencerClient("test_c1")
+    client2 = SequencerClient("test_c2")
+    queue1 = client1.create_queue("c1 queue")
+    queue2 = client2.create_queue("c2 queue")
+
+    status1 = queue1.get_status()
+    assert status1.queue_id == queue1.queue_id
+    assert status1.running is False
+    assert status1.tick_time == 0
+    assert status1.real_time == 0
+
+    status2 = client1.get_queue_status(queue2.queue_id)
+    assert status2.queue_id == queue2.queue_id
+    assert status2.running is False
+    assert status2.tick_time == 0
+    assert status2.real_time == 0
+
+    queue1.start()
+    client1.drain_output()
+    time.sleep(0.1)
+
+    status1a = queue1.get_status()
+    assert status1a.queue_id == queue1.queue_id
+    assert status1a.running is True
+    assert status1a.tick_time > 0
+    assert float(status1a.real_time) > 0.0
 
     client1.close()
     client2.close()

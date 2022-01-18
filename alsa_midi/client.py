@@ -17,7 +17,7 @@ from .exceptions import StateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
                    WRITE_PORT_PREFERRED_TYPES, Port, PortCaps, PortInfo, PortType,
                    get_port_info_sort_key)
-from .queue import Queue, QueueInfo
+from .queue import Queue, QueueInfo, QueueStatus
 from .util import _check_alsa_error
 
 _snd_seq_t = NewType("_snd_seq_t", object)
@@ -1424,6 +1424,23 @@ class SequencerClientBase:
         queue_id = alsa.snd_seq_query_named_queue(self.handle, name.encode("utf-8"))
         _check_alsa_error(queue_id)
         return queue_id
+
+    def get_queue_status(self, queue_id: int) -> QueueStatus:
+        """Get queue status.
+
+        Wraps :alsa:`snd_seq_get_queue_status`.
+
+        :param queue_id: identifier of the queue
+        """
+        self._check_handle()
+        status_p = ffi.new("snd_seq_queue_status_t **")
+        err = alsa.snd_seq_queue_status_malloc(status_p)
+        _check_alsa_error(err)
+        status = ffi.gc(status_p[0], alsa.snd_seq_queue_status_free)
+        err = alsa.snd_seq_get_queue_status(self.handle, queue_id, status)
+        _check_alsa_error(err)
+        result = QueueStatus._from_alsa(status)
+        return result
 
 
 class SequencerClient(SequencerClientBase):
