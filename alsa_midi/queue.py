@@ -1,6 +1,7 @@
 
 from collections import namedtuple
-from typing import TYPE_CHECKING, NewType, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, NewType, Optional, Union
 
 from ._ffi import alsa, ffi
 from .event import EventType, RealTime
@@ -103,7 +104,7 @@ class QueueStatus(namedtuple("QueueStatus", "queue_id events tick_time real_time
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_queue_status_t):
-        """Create a ClientInfo object from ALSA :alsa:`snd_seq_system_info_t`."""
+        """Create a QueueStatus object from ALSA :alsa:`snd_seq_system_info_t`."""
         real_time = alsa.snd_seq_queue_status_get_real_time(info)
         return cls(
                 queue_id=alsa.snd_seq_queue_status_get_queue(info),
@@ -117,6 +118,47 @@ class QueueStatus(namedtuple("QueueStatus", "queue_id events tick_time real_time
     def running(self):
         """Whether the queue is running."""
         return bool(self.status & 1)
+
+
+_snd_seq_queue_tempo_t = NewType("_snd_seq_queue_tempo_t", object)
+
+
+@dataclass
+class QueueTempo:
+    """Queue tempo.
+
+    Represents data from :alsa:`snd_seq_queue_tempo_t`
+
+    :param tempo: MIDI tempo (microseconds per quarter note)
+    :param ppq: MIDI pulses per quarter note
+    :param skew: timer skew value
+    :param skew_base: timer skew base value (only allowed value is 0x10000).
+
+    :ivar tempo: MIDI tempo (microseconds per quarter note)
+    :ivar ppq: MIDI pulses per quarter note
+    :ivar skew: timer skew value
+    :ivar skew_base: timer skew base value (only allowed value is 0x10000).
+    """
+
+    tempo: int
+    ppq: int
+    skew: Optional[int] = None
+    skew_base: Optional[int] = None
+
+    @classmethod
+    def _from_alsa(cls, tempo: _snd_seq_queue_tempo_t):
+        """Create a QueueTempo object from ALSA :alsa:`snd_seq_system_tempo_t`."""
+        return cls(
+                tempo=alsa.snd_seq_queue_tempo_get_tempo(tempo),
+                ppq=alsa.snd_seq_queue_tempo_get_ppq(tempo),
+                skew=alsa.snd_seq_queue_tempo_get_skew(tempo),
+                skew_base=alsa.snd_seq_queue_tempo_get_skew_base(tempo),
+                )
+
+    @property
+    def bpm(self):
+        """Approximate beats per minute value for the selected tempo."""
+        return 60000000.0 / self.tempo
 
 
 class Queue:
@@ -171,11 +213,14 @@ class Queue:
             else:
                 alsa.snd_seq_set_queue_usage(handle, queue, 0)
 
-    def set_tempo(self, tempo: int = 500000, ppq: int = 96):
+    def set_tempo(self, tempo: Union[int, QueueTempo] = None, ppq: int = None,
+                  skew=None, skew_base=None, bpm=None):
         """Set the tempo of the queue.
 
         :param tempo: MIDI tempo – microseconds per quarter note
-        :param ppq: MIDI pulses per quarter note
+        :param ppq: MIDI pulses per quarter note (default: 96)
+        :param skew: timer skew value
+        :param skew_base: timer skew base value
 
         Wraps :alsa:`snd_seq_set_queue_tempo`.
         """
@@ -184,10 +229,50 @@ class Queue:
         err = alsa.snd_seq_queue_tempo_malloc(q_tempo_p)
         _check_alsa_error(err)
         q_tempo = ffi.gc(q_tempo_p[0], alsa.snd_seq_queue_tempo_free)
+
+        if bpm is not None:
+            if tempo is not None:
+                raise ValueError("Either tempo or bpm must be given")
+            tempo = int(60000000 // bpm)
+        elif tempo is None:
+            raise ValueError("Either tempo or bpm must be given")
+        elif isinstance(tempo, QueueTempo):
+            if ppq is None:
+                ppq = tempo.ppq
+            if skew is None:
+                skew = tempo.skew
+            if skew_base is None:
+                skew_base = tempo.skew_base
+            tempo = tempo.tempo
+
+        if ppq is None:
+            ppq = 96
+
         alsa.snd_seq_queue_tempo_set_tempo(q_tempo, tempo)
         alsa.snd_seq_queue_tempo_set_ppq(q_tempo, ppq)
+        if skew:
+            alsa.snd_seq_queue_tempo_set_skew(q_tempo, skew)
+            if not skew_base:
+                skew_base = 0x10000
+        if skew_base:
+            alsa.snd_seq_queue_tempo_set_skew_base(q_tempo, skew_base)
+
         err = alsa.snd_seq_set_queue_tempo(handle, self.queue_id, q_tempo)
         _check_alsa_error(err)
+
+    def get_tempo(self):
+        """Get the tempo of the queue.
+
+        Wraps :alsa:`snd_seq_get_queue_tempo`.
+        """
+        handle = self._get_client_handle()
+        q_tempo_p = ffi.new("snd_seq_queue_tempo_t **", ffi.NULL)
+        err = alsa.snd_seq_queue_tempo_malloc(q_tempo_p)
+        _check_alsa_error(err)
+        q_tempo = ffi.gc(q_tempo_p[0], alsa.snd_seq_queue_tempo_free)
+        err = alsa.snd_seq_get_queue_tempo(handle, self.queue_id, q_tempo)
+        _check_alsa_error(err)
+        return QueueTempo._from_alsa(q_tempo)
 
     def control(self, event_type: EventType, value: int = 0):
         """Queue control (start/stop/continue).
@@ -282,4 +367,4 @@ class Queue:
         return self.client.get_queue_status(self.queue_id)
 
 
-__all__ = ["Queue", "QueueInfo", "QueueStatus"]
+__all__ = ["Queue", "QueueInfo", "QueueStatus", "QueueTempo"]

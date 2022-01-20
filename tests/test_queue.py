@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from alsa_midi import ALSAError, Queue, QueueInfo, SequencerClient
+from alsa_midi import ALSAError, Queue, QueueInfo, QueueTempo, SequencerClient
 
 
 @pytest.mark.require_alsa_seq
@@ -335,3 +335,67 @@ def test_queue_status():
 
     client1.close()
     client2.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_queue_tempo():
+    client = SequencerClient("test")
+    queue = client.create_queue("queue")
+
+    tempo1 = queue.get_tempo()
+    assert isinstance(tempo1, QueueTempo)
+    assert isinstance(tempo1.tempo, int)
+    assert isinstance(tempo1.ppq, int)
+    assert isinstance(tempo1.skew, int)
+    assert isinstance(tempo1.skew_base, int)
+    assert tempo1.bpm == pytest.approx(60.0 * 1000000 / tempo1.tempo)
+
+    tempo2 = QueueTempo(tempo=500000, ppq=12)
+    assert tempo2.tempo == 500000
+    assert tempo2.ppq == 12
+    assert tempo2.skew is None
+    assert tempo2.skew_base is None
+    assert tempo2.bpm == pytest.approx(120.0)
+
+    queue.set_tempo(tempo2)
+
+    tempo3 = queue.get_tempo()
+
+    assert tempo3.tempo == 500000
+    assert tempo3.ppq == 12
+    assert isinstance(tempo3.skew, int)
+    assert isinstance(tempo3.skew_base, int)
+    assert tempo3.bpm == pytest.approx(120.0)
+
+    tempo4 = QueueTempo(tempo=1000000, ppq=96, skew=0x8000, skew_base=0x10000)
+    assert tempo4.tempo == 1000000
+    assert tempo4.ppq == 96
+    assert tempo4.skew == 0x8000
+    assert tempo4.skew_base == 0x10000
+    assert tempo4.bpm == pytest.approx(60.0)
+
+    queue.set_tempo(tempo4)
+
+    tempo5 = queue.get_tempo()
+    assert tempo5.tempo == 1000000
+    assert tempo5.ppq == 96
+    assert tempo5.skew == 0x8000
+    assert tempo5.skew_base == 0x10000
+    assert tempo5.bpm == pytest.approx(60.0)
+
+    queue.set_tempo(bpm=120)
+
+    tempo6 = queue.get_tempo()
+    assert tempo6.tempo == 500000
+    assert tempo6.ppq == 96
+    assert tempo6.skew == 0x8000
+    assert tempo6.skew_base == 0x10000
+
+    queue.set_tempo(1000000, skew=0x10000)
+
+    tempo7 = queue.get_tempo()
+    assert tempo7.tempo == 1000000
+    assert tempo7.skew == 0x10000
+    assert tempo7.skew_base == 0x10000
+
+    client.close()

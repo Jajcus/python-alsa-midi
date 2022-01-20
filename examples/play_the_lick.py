@@ -52,7 +52,7 @@ def main():
     port = client.create_port("output", READ_PORT)
     queue = client.create_queue()
 
-    queue.set_tempo(int(60.0 * 1000000 / args.bpm), 3)
+    queue.set_tempo(bpm=args.bpm, ppq=3)
 
     if args.port:
         targets = args.port

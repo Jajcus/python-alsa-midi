@@ -11,3 +11,6 @@ Queues
 
 .. autoclass:: QueueStatus
    :members:
+
+.. autoclass:: QueueTempo
+   :members:
