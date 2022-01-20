@@ -3,7 +3,7 @@ import asyncio
 import errno
 import select
 import time
-from collections import namedtuple
+from dataclasses import dataclass
 from enum import IntEnum, IntFlag
 from functools import partial
 from typing import (Any, Callable, List, MutableMapping, NewType, Optional, Set, Tuple, Union,
@@ -55,6 +55,7 @@ class SequencerType(IntEnum):
 _snd_seq_client_info_t = NewType("_snd_seq_client_info_t", object)
 
 
+@dataclass
 class ClientInfo:
     """Client information.
 
@@ -81,37 +82,15 @@ class ClientInfo:
     :ivar event_lost: number of lost events
     """
     client_id: int
-    name: str
-    broadcast_filter: bool
-    error_bounce: bool
-    type: Optional[ClientType]
-    card_id: Optional[int]
-    pid: Optional[int]
-    num_ports: int
-    event_lost: int
-    event_filter: Optional[Set[EventType]]
-
-    def __init__(self,
-                 client_id: int,
-                 name: str,
-                 broadcast_filter: bool = False,
-                 error_bounce: bool = False,
-                 type: ClientType = None,
-                 card_id: Optional[int] = None,
-                 pid: Optional[int] = None,
-                 num_ports: int = 0,
-                 event_lost: int = 0,
-                 event_filter: Optional[Set[EventType]] = None):
-        self.client_id = client_id
-        self.name = name
-        self.broadcast_filter = broadcast_filter
-        self.error_bounce = error_bounce
-        self.type = type
-        self.card_id = card_id
-        self.pid = pid
-        self.num_ports = num_ports
-        self.event_lost = event_lost
-        self.event_filter = event_filter
+    name: str = ""
+    broadcast_filter: bool = False
+    error_bounce: bool = False
+    type: Optional[ClientType] = None
+    card_id: Optional[int] = None
+    pid: Optional[int] = None
+    num_ports: int = 0
+    event_lost: int = 0
+    event_filter: Optional[Set[EventType]] = None
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_client_info_t):
@@ -177,7 +156,8 @@ class ClientInfo:
 _snd_seq_system_info_t = NewType("_snd_seq_system_info_t", object)
 
 
-class SystemInfo(namedtuple("SystemInfo", "queues clients ports channels cur_clients cur_queues")):
+@dataclass
+class SystemInfo:
     """System information.
 
     Represents data from :alsa:`snd_seq_system_info_t`
@@ -195,8 +175,6 @@ class SystemInfo(namedtuple("SystemInfo", "queues clients ports channels cur_cli
     channels: int
     cur_clients: int
     cur_queues: int
-
-    __slots__ = ()
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_system_info_t):
@@ -219,6 +197,7 @@ class SubscriptionQueryType(IntEnum):
     WRITE = alsa.SND_SEQ_QUERY_SUBS_WRITE
 
 
+@dataclass
 class SubscriptionQuery:
     """Port subscription (connection) information.
 
@@ -244,37 +223,22 @@ class SubscriptionQuery:
     :ivar time_update: time update enabled
     :ivar time_real: user real time stamps
     """
-    root: Address
-    type: SubscriptionQueryType
-    index: int
-    num_subs: int
-    addr: Address
-    queue_id: int
-    exclusive: bool
-    time_update: bool
-    time_real: bool
+    root: Address = Address(0, 0)
+    type: SubscriptionQueryType = SubscriptionQueryType.READ
+    index: int = 0
+    num_subs: int = 0
+    addr: Address = Address(0, 0)
+    queue_id: int = 0
+    exclusive: bool = False
+    time_update: bool = False
+    time_real: bool = False
 
-    def __init__(self,
-                 root: AddressType,
-                 type: SubscriptionQueryType,
-                 *,
-                 index: int = 0,
-                 num_subs: int = 0,
-                 addr: AddressType = (0, 0),
-                 queue_id: int = 0,
-                 exclusive: bool = False,
-                 time_update: bool = False,
-                 time_real: bool = False):
-
-        self.root = Address(root)
-        self.type = type
-        self.index = index
-        self.num_subs = num_subs
-        self.addr = Address(addr)
-        self.queue_id = queue_id
-        self.exlusive = bool(exclusive)
-        self.time_update = bool(time_update)
-        self.time_real = bool(time_real)
+    def __post_init__(self):
+        self.root = Address(self.root)
+        self.addr = Address(self.addr)
+        self.exlusive = bool(self.exclusive)
+        self.time_update = bool(self.time_update)
+        self.time_real = bool(self.time_real)
 
     @classmethod
     def _from_alsa(cls, query: _snd_seq_query_subscribe_t):
@@ -309,6 +273,7 @@ class SubscriptionQuery:
 _snd_seq_client_pool_t = NewType("_snd_seq_client_pool_t", object)
 
 
+@dataclass
 class ClientPool:
     """Client kernel-side memory pool information.
 
@@ -321,28 +286,12 @@ class ClientPool:
     :ivar output_free: amount of free space in the output pool
     :ivar input_free: amount of free space in the input pool
     """
-    client_id: int
-    output_pool: int
-    input_pool: int
-    output_room: int
-    output_free: int
-    input_free: int
-
-    def __init__(self,
-                 output_pool: int,
-                 input_pool: int,
-                 output_room: int,
-                 *,
-                 client_id: int = 0,
-                 output_free: int = 0,
-                 input_free: int = 0):
-
-        self.client_id = client_id
-        self.output_pool = output_pool
-        self.input_pool = input_pool
-        self.output_room = output_room
-        self.output_free = output_free
-        self.input_free = input_free
+    client_id: int = 0
+    output_pool: int = 0
+    input_pool: int = 0
+    output_room: int = 0
+    output_free: int = 0
+    input_free: int = 0
 
     @classmethod
     def _from_alsa(cls, pool: _snd_seq_client_pool_t):

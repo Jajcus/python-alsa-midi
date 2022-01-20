@@ -1,4 +1,5 @@
 
+from dataclasses import InitVar, dataclass, field
 from enum import IntFlag
 from typing import TYPE_CHECKING, Any, Callable, List, NewType, Optional
 
@@ -191,6 +192,7 @@ class Port:
 _snd_seq_port_info_t = NewType("_snd_seq_port_info_t", object)
 
 
+@dataclass
 class PortInfo:
     """Sequencer port information.
 
@@ -204,7 +206,6 @@ class PortInfo:
     :ivar synth_voices: number of synth voices
     :ivar read_use: number of readers
     :ivar write_use: number of writers
-    :ivar port_specified: `True` when port is specified in the structure
     :ivar timestamping: enable time stamping
     :ivar timestamp_real: use real time (not MIDI ticks) for time stamping
     :ivar timestamp_queue_id: queue used for timestamping
@@ -216,64 +217,26 @@ class PortInfo:
     :meth:`~alsa_midi.SequencerClient.list_ports()`.
     """
 
-    client_id: int
-    port_id: int
-    name: str
-    capability: PortCaps
-    type: PortType
-    midi_channels: int
-    midi_voices: int
-    synth_voices: int
-    read_use: int
-    write_use: int
-    port_specified: bool
-    timestamping: bool
-    timestamp_real: bool
-    timestamp_queue_id: int
+    client_id: int = 0
+    port_id: Optional[int] = None
+    name: str = ""
+    capability: PortCaps = PortCaps._NONE
+    type: PortType = PortType.ANY
+    midi_channels: int = 0
+    midi_voices: int = 0
+    synth_voices: int = 0
+    read_use: int = 0
+    write_use: int = 0
+    port_specified: InitVar[Optional[bool]] = None
+    timestamping: bool = False
+    timestamp_real: bool = False
+    timestamp_queue_id: int = 0
 
-    client_name: Optional[str]
+    client_name: Optional[str] = field(init=False, default=None)
 
-    def __init__(self,
-                 client_id: int = 0,
-                 port_id: int = None,
-                 name: str = None,
-                 capability: PortCaps = PortCaps._NONE,
-                 type: PortType = PortType.ANY,
-                 midi_channels: int = 0,
-                 midi_voices: int = 0,
-                 synth_voices: int = 0,
-                 read_use: int = 0,
-                 write_use: int = 0,
-                 port_specified: bool = None,
-                 timestamping: bool = False,
-                 timestamp_real: bool = False,
-                 timestamp_queue_id: int = 0):
-
-        self.client_id = client_id
-        if port_id is not None:
-            self.port_id = port_id
-            if port_specified is None:
-                port_specified = True
-        else:
-            self.port_id = 0
-            if port_specified is None:
-                port_specified = False
-        if name:
-            self.name = name
-        else:
-            self.name = ""
-        self.capability = capability
-        self.type = type
-        self.midi_channels = midi_channels
-        self.midi_voices = midi_voices
-        self.synth_voices = synth_voices
-        self.read_use = read_use
-        self.write_use = write_use
-        self.port_specified = port_specified
-        self.timestamping = timestamping
-        self.timestamp_real = timestamp_real
-        self.timestamp_queue_id = timestamp_queue_id
-        self.client_name = None
+    def __post_init__(self, port_specified=None):
+        if port_specified is not None and not port_specified:
+            self.port_id = None
 
     def __repr__(self):
         if self.client_name is not None:
@@ -298,7 +261,6 @@ class PortInfo:
                 synth_voices=alsa.snd_seq_port_info_get_synth_voices(info),
                 read_use=alsa.snd_seq_port_info_get_read_use(info),
                 write_use=alsa.snd_seq_port_info_get_write_use(info),
-                port_specified=(alsa.snd_seq_port_info_get_port_specified(info) == 1),
                 timestamping=(alsa.snd_seq_port_info_get_timestamping(info) == 1),
                 timestamp_real=(alsa.snd_seq_port_info_get_timestamp_real(info) == 1),
                 timestamp_queue_id=alsa.snd_seq_port_info_get_timestamp_queue(info),
@@ -310,14 +272,14 @@ class PortInfo:
         _check_alsa_error(err)
         info = ffi.gc(info_p[0], alsa.snd_seq_port_info_free)
         alsa.snd_seq_port_info_set_client(info, self.client_id)
-        alsa.snd_seq_port_info_set_port(info, self.port_id)
+        alsa.snd_seq_port_info_set_port(info, self.port_id if self.port_id is not None else 0)
         alsa.snd_seq_port_info_set_name(info, self.name.encode())
         alsa.snd_seq_port_info_set_capability(info, self.capability)
         alsa.snd_seq_port_info_set_type(info, self.type)
         alsa.snd_seq_port_info_set_midi_channels(info, self.midi_channels)
         alsa.snd_seq_port_info_set_midi_voices(info, self.midi_voices)
         alsa.snd_seq_port_info_set_synth_voices(info, self.synth_voices)
-        alsa.snd_seq_port_info_set_port_specified(info, self.port_specified)
+        alsa.snd_seq_port_info_set_port_specified(info, self.port_id is not None)
         alsa.snd_seq_port_info_set_timestamping(info, self.timestamping)
         alsa.snd_seq_port_info_set_timestamp_real(info, self.timestamp_real)
         alsa.snd_seq_port_info_set_timestamp_queue(info, self.timestamp_queue_id)

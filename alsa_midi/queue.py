@@ -1,5 +1,4 @@
 
-from collections import namedtuple
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NewType, Optional, Union
 
@@ -14,6 +13,7 @@ if TYPE_CHECKING:
 _snd_seq_queue_info_t = NewType("_snd_seq_queue_info_t", object)
 
 
+@dataclass
 class QueueInfo:
     """Sequencer queue information.
 
@@ -32,24 +32,11 @@ class QueueInfo:
     :ivar flags: conditional bit flags
     """
 
-    queue_id: int
-    name: str
-    owner: int
-    locked: bool
-    flags: int
-
-    def __init__(self,
-                 queue_id: int = 0,
-                 name: str = "",
-                 owner: int = 0,
-                 locked: bool = False,
-                 flags: int = 0):
-
-        self.queue_id = queue_id
-        self.name = name
-        self.owner = owner
-        self.locked = locked
-        self.flags = flags
+    queue_id: int = 0
+    name: str = ""
+    owner: int = 0
+    locked: bool = False
+    flags: int = 0
 
     def __repr__(self):
         return f"<QueueInfo #{self.queue_id} {self.name!r}>"
@@ -83,7 +70,8 @@ class QueueInfo:
 _snd_seq_queue_status_t = NewType("_snd_seq_queue_status_t", object)
 
 
-class QueueStatus(namedtuple("QueueStatus", "queue_id events tick_time real_time status")):
+@dataclass
+class QueueStatus:
     """Queue status.
 
     Represents data from :alsa:`snd_seq_queue_status_t`
@@ -94,13 +82,11 @@ class QueueStatus(namedtuple("QueueStatus", "queue_id events tick_time real_time
     :ivar real_time: queue time in seconds and nanoseconds
     :ivar status: running status bits
     """
-    queue_id: int
-    events: int
-    tick_time: int
-    real_time: RealTime
-    status: int
-
-    __slots__ = ()
+    queue_id: int = 0
+    events: int = 0
+    tick_time: int = 0
+    real_time: RealTime = RealTime(0, 0)
+    status: int = 0
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_queue_status_t):
@@ -140,8 +126,8 @@ class QueueTempo:
     :ivar skew_base: timer skew base value (only allowed value is 0x10000).
     """
 
-    tempo: int
-    ppq: int
+    tempo: int = 500000
+    ppq: int = 96
     skew: Optional[int] = None
     skew_base: Optional[int] = None
 

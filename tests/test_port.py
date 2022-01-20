@@ -137,7 +137,7 @@ def test_port_info():
     info = PortInfo(client_id=11)
 
     assert info.client_id == 11
-    assert info.port_id == 0
+    assert info.port_id is None
     assert info.name == ""
     assert info.capability == PortCaps._NONE
     assert info.type == PortType.ANY
@@ -146,7 +146,6 @@ def test_port_info():
     assert info.synth_voices == 0
     assert info.read_use == 0
     assert info.write_use == 0
-    assert info.port_specified is False
     assert info.timestamping is False
     assert info.timestamp_real is False
     assert info.timestamp_queue_id == 0
@@ -177,7 +176,6 @@ def test_port_info():
     assert info.synth_voices == 3
     assert info.read_use == 4
     assert info.write_use == 5
-    assert info.port_specified is True
     assert info.timestamping is True
     assert info.timestamp_real is True
     assert info.timestamp_queue_id == 6
@@ -234,7 +232,6 @@ def test_port_info():
     assert info.midi_channels == 11
     assert info.midi_voices == 12
     assert info.synth_voices == 13
-    assert info.port_specified is True
     assert info.timestamping is True
     assert info.timestamp_real is True
     assert info.timestamp_queue_id == 16

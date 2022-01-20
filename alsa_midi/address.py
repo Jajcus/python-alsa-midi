@@ -65,10 +65,12 @@ class Address(namedtuple("Address", "client_id port_id")):
         elif hasattr(arg1, "client_id"):
             client_id = arg1.client_id  # type: ignore
             port_id = getattr(arg1, "port_id", arg2)
+            if port_id is None:
+                port_id = 0
             tple: Any = (client_id, port_id)
             return tuple.__new__(cls, tple)
         elif isinstance(arg1, tuple):
-            tple: Any = arg1
+            tple: Any = (int(v) if v is not None else 0 for v in arg1)
             return tuple.__new__(cls, tple)
         else:
             tple: Any = (int(arg1), int(arg2))  # type: ignore
