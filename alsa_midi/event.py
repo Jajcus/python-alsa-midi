@@ -382,6 +382,14 @@ class Event:
 
         return a_event
 
+    def length(self):
+        """Calculates the (encoded) byte-stream size of the event.
+
+        Wraps :alsa:`snd_seq_event_length`."""
+        alsa_event: _snd_seq_event_t = ffi.new("snd_seq_event_t *")
+        self._to_alsa(alsa_event)
+        return alsa.snd_seq_event_length(alsa_event)
+
 
 class MidiBytesEvent(Event):
     """Pseudo ALSA event to hold MIDI messages as byte sequences.

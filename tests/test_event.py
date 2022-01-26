@@ -2252,3 +2252,12 @@ def test_user_var_event(event_class, event_type):
     assert event.tag == 9
     assert event.data == b"0123456789"
     assert repr(event) == f"<{event_class.__name__} data=b'0123456789'>"
+
+
+def test_event_length():
+    event = NoteOnEvent(62, 5, 6, tag=9)
+    assert event.length() == 28
+    event = NoteOnEvent(63, 1, 1)
+    assert event.length() == 28
+    event = SysExEvent(b"\xf012345\xf7")
+    assert event.length() == 35
