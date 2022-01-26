@@ -4,7 +4,9 @@ import time
 
 import pytest
 
-from alsa_midi import ALSAError, Queue, QueueInfo, QueueTempo, SequencerClient
+from alsa_midi import (ALSAError, Queue, QueueInfo, QueueTempo, QueueTimer, QueueTimerType,
+                       SequencerClient)
+from alsa_midi.queue import TimerId
 
 
 @pytest.mark.require_alsa_seq
@@ -397,5 +399,51 @@ def test_queue_tempo():
     assert tempo7.tempo == 1000000
     assert tempo7.skew == 0x10000
     assert tempo7.skew_base == 0x10000
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_queue_timer():
+    client = SequencerClient("test")
+    queue = client.create_queue("queue")
+
+    timer1 = queue.get_timer()
+
+    assert isinstance(timer1.id, TimerId)
+    assert isinstance(timer1.id.dev_class, int)
+    assert isinstance(timer1.id.dev_sclass, int)
+    assert isinstance(timer1.id.card, int)
+    assert isinstance(timer1.id.device, int)
+    assert isinstance(timer1.id.subdevice, int)
+    assert timer1.queue_id == queue.queue_id
+    assert timer1.type == QueueTimerType.ALSA
+    assert timer1.resolution == 0
+
+    timer2 = QueueTimer(id=timer1.id,
+                        type=QueueTimerType.ALSA,
+                        resolution=100)
+
+    assert timer2.type == QueueTimerType.ALSA
+    assert timer2.resolution == 100
+
+    queue.set_timer(timer2)
+
+    timer3 = queue.get_timer()
+
+    assert timer3.queue_id == queue.queue_id
+    assert timer3.type == QueueTimerType.ALSA
+    assert timer3.resolution == 100
+
+    timer4 = QueueTimer(type=QueueTimerType.MIDI_CLOCK,
+                        resolution=1024)
+
+    assert timer4.type == QueueTimerType.MIDI_CLOCK
+    assert timer4.resolution == 1024
+
+    # only QueueTimerType.ALSA is supported by kernel
+    with pytest.raises(ALSAError) as exc:
+        queue.set_timer(timer4)
+    assert exc.value.errnum == -errno.EINVAL
 
     client.close()

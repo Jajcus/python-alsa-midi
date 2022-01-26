@@ -14,3 +14,14 @@ Queues
 
 .. autoclass:: QueueTempo
    :members:
+
+.. autoclass:: QueueTimer
+   :members:
+
+.. autoclass:: QueueTimerType
+   :members:
+
+.. py:currentmodule:: alsa_midi.queue
+
+.. autoclass:: TimerId
+   :members:

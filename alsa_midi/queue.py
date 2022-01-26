@@ -1,6 +1,7 @@
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, NewType, Optional, Union
+from enum import IntEnum
+from typing import TYPE_CHECKING, NamedTuple, NewType, Optional, Union
 
 from ._ffi import alsa, ffi
 from .event import EventType, RealTime
@@ -90,7 +91,7 @@ class QueueStatus:
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_queue_status_t):
-        """Create a QueueStatus object from ALSA :alsa:`snd_seq_system_info_t`."""
+        """Create a QueueStatus object from ALSA :alsa:`snd_seq_queue_status_t`."""
         real_time = alsa.snd_seq_queue_status_get_real_time(info)
         return cls(
                 queue_id=alsa.snd_seq_queue_status_get_queue(info),
@@ -133,7 +134,7 @@ class QueueTempo:
 
     @classmethod
     def _from_alsa(cls, tempo: _snd_seq_queue_tempo_t):
-        """Create a QueueTempo object from ALSA :alsa:`snd_seq_system_tempo_t`."""
+        """Create a QueueTempo object from ALSA :alsa:`snd_seq_queue_tempo_t`."""
         return cls(
                 tempo=alsa.snd_seq_queue_tempo_get_tempo(tempo),
                 ppq=alsa.snd_seq_queue_tempo_get_ppq(tempo),
@@ -145,6 +146,94 @@ class QueueTempo:
     def bpm(self):
         """Approximate beats per minute value for the selected tempo."""
         return 60000000.0 / self.tempo
+
+
+class QueueTimerType(IntEnum):
+    """Queue timer type."""
+    ALSA = alsa.SND_SEQ_TIMER_ALSA
+    MIDI_CLOCK = alsa.SND_SEQ_TIMER_MIDI_CLOCK
+    MIDI_TICK = alsa.SND_SEQ_TIMER_MIDI_TICK
+
+
+class TimerId(NamedTuple):
+    """Queue timer identification (named tuple).
+
+    Points to a specific timer device.
+
+    :ivar dev_class: timer class
+    :ivar dev_sclass: timer subclass
+    :ivar card: timer card
+    :ivar device: timer device
+    :ivar subdevice: timer subdevice
+    """
+    dev_class: int
+    dev_sclass: int
+    card: int
+    device: int
+    subdevice: int
+
+
+_snd_seq_queue_timer_t = NewType("_snd_seq_queue_timer_t", object)
+
+
+@dataclass
+class QueueTimer:
+    """Queue timer.
+
+    Represents data from :alsa:`snd_seq_queue_timer_t`
+
+    :param id: timer device identification
+    :param queue_id: queue id
+    :param type: timer type
+    :param resolution: timer resolution
+
+    :ivar id: timer device identification
+    :ivar queue_id: queue id
+    :ivar type: timer type
+    :ivar resolution: timer resolution
+    """
+
+    id: TimerId = TimerId(0, 0, 0, 0, 0)
+    queue_id: int = 0
+    type: QueueTimerType = QueueTimerType.ALSA
+    resolution: int = 0
+
+    @classmethod
+    def _from_alsa(cls, a_timer: _snd_seq_queue_timer_t):
+        """Create a QueueTimer object from ALSA :alsa:`snd_seq_timer_t`."""
+        a_timer_id = alsa.snd_seq_queue_timer_get_id(a_timer)
+        timer_id = TimerId(dev_class=alsa.snd_timer_id_get_class(a_timer_id),
+                           dev_sclass=alsa.snd_timer_id_get_sclass(a_timer_id),
+                           card=alsa.snd_timer_id_get_card(a_timer_id),
+                           device=alsa.snd_timer_id_get_device(a_timer_id),
+                           subdevice=alsa.snd_timer_id_get_subdevice(a_timer_id))
+        return cls(
+                id=timer_id,
+                queue_id=alsa.snd_seq_queue_timer_get_queue(a_timer),
+                type=alsa.snd_seq_queue_timer_get_type(a_timer),
+                resolution=alsa.snd_seq_queue_timer_get_resolution(a_timer),
+                )
+
+    def _to_alsa(self) -> _snd_seq_queue_timer_t:
+        timer_p = ffi.new("snd_seq_queue_timer_t **")
+        err = alsa.snd_seq_queue_timer_malloc(timer_p)
+        _check_alsa_error(err)
+        a_timer = ffi.gc(timer_p[0], alsa.snd_seq_queue_timer_free)
+        a_timer_id_p = ffi.new("snd_timer_id_t **")
+        err = alsa.snd_timer_id_malloc(a_timer_id_p)
+        _check_alsa_error(err)
+        a_timer_id = ffi.gc(a_timer_id_p[0], alsa.snd_timer_id_free)
+
+        alsa.snd_timer_id_set_class(a_timer_id, self.id.dev_class)
+        alsa.snd_timer_id_set_sclass(a_timer_id, self.id.dev_sclass)
+        alsa.snd_timer_id_set_card(a_timer_id, self.id.card)
+        alsa.snd_timer_id_set_device(a_timer_id, self.id.device)
+        alsa.snd_timer_id_set_subdevice(a_timer_id, self.id.subdevice)
+        alsa.snd_seq_queue_timer_set_id(a_timer, a_timer_id)
+        alsa.snd_seq_queue_timer_set_type(a_timer, int(self.type))
+        alsa.snd_seq_queue_timer_set_resolution(a_timer, int(self.resolution))
+
+        return a_timer
 
 
 class Queue:
@@ -352,5 +441,29 @@ class Queue:
             raise StateError("Already closed")
         return self.client.get_queue_status(self.queue_id)
 
+    def get_timer(self) -> QueueTimer:
+        """Obtain queue timer parameters.
 
-__all__ = ["Queue", "QueueInfo", "QueueStatus", "QueueTempo"]
+        Wraps :alsa:`snd_seq_get_queue_timer`."""
+        handle = self._get_client_handle()
+        timer_p = ffi.new("snd_seq_queue_timer_t **")
+        err = alsa.snd_seq_queue_timer_malloc(timer_p)
+        _check_alsa_error(err)
+        a_timer = ffi.gc(timer_p[0], alsa.snd_seq_queue_timer_free)
+        err = alsa.snd_seq_get_queue_timer(handle, self.queue_id, a_timer)
+        _check_alsa_error(err)
+        return QueueTimer._from_alsa(a_timer)
+
+    def set_timer(self, timer: QueueTimer):
+        """Change queue timer parameters.
+
+        Wraps :alsa:`snd_seq_get_queue_timer`."""
+
+        handle = self._get_client_handle()
+        a_timer = timer._to_alsa()
+        err = alsa.snd_seq_set_queue_timer(handle, self.queue_id, a_timer)
+        _check_alsa_error(err)
+        return timer
+
+
+__all__ = ["Queue", "QueueInfo", "QueueStatus", "QueueTempo", "QueueTimer", "QueueTimerType"]

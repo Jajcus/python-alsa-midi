@@ -19,7 +19,7 @@ from .event import (ActiveSensingEvent, BounceEvent, ChannelPressureEvent, Clien
                     UserVar2Event, UserVar3Event, UserVar4Event)
 from .exceptions import ALSAError, Error, StateError
 from .port import READ_PORT, RW_PORT, WRITE_PORT, Port, PortCaps, PortInfo, PortType
-from .queue import Queue, QueueInfo, QueueStatus, QueueTempo
+from .queue import Queue, QueueInfo, QueueStatus, QueueTempo, QueueTimer, QueueTimerType
 
 __all__ = [
         "Address", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE",
@@ -29,7 +29,7 @@ __all__ = [
         "Error", "StateError", "ALSAError",
         "Port", "PortCaps", "PortType", "PortInfo",
         "READ_PORT", "WRITE_PORT", "RW_PORT",
-        "Queue", "QueueInfo", "QueueStatus", "QueueTempo",
+        "Queue", "QueueInfo", "QueueStatus", "QueueTempo", "QueueTimer", "QueueTimerType",
         "alsa", "ffi",
 
         "SystemEvent", "ResultEvent", "NoteEvent", "NoteOnEvent", "NoteOffEvent",
