@@ -858,6 +858,15 @@ class SequencerClientBase:
                 break
         return result
 
+    def event_output_pending(self) -> int:
+        """Return the size of pending events on output buffer.
+
+        Wraps :alsa:`snd_seq_event_output_pending`."""
+        self._check_handle()
+        result = alsa.snd_seq_event_output_pending(self.handle)
+        _check_alsa_error(result)
+        return result
+
     def get_system_info(self) -> SystemInfo:
         """Obtain information about the sequencer.
 

@@ -59,3 +59,26 @@ def test_event_output(aseqdump):
 
     aseqdump.close()
     client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_event_output_pending():
+
+    # prepare the client and port
+    client = SequencerClient("test")
+    port = client.create_port("output", READ_PORT)
+
+    pending1 = client.event_output_pending()
+    assert pending1 == 0
+
+    e1 = NoteOnEvent(note=64)
+    client.event_output(e1, port=port)
+    pending2 = client.event_output_pending()
+    assert pending2 > 0
+
+    e2 = NoteOffEvent(note=64)
+    client.event_output(e2, port=port)
+    pending3 = client.event_output_pending()
+    assert pending3 > pending2
+
+    client.close()
