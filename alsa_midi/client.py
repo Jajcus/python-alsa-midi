@@ -606,12 +606,21 @@ class SequencerClientBase:
         _check_alsa_error(err)
 
     def drop_output(self):
-        """Remove all events from the output buffer.
+        """Remove all events from the output buffer (client and kernel side).
 
         Wraps :alsa:`snd_seq_drop_output`.
         """
         self._check_handle()
         err = alsa.snd_seq_drop_output(self.handle)
+        _check_alsa_error(err)
+
+    def drop_output_buffer(self):
+        """Remove all events from the output buffer (client side only).
+
+        Wraps :alsa:`snd_seq_drop_output_buffer`.
+        """
+        self._check_handle()
+        err = alsa.snd_seq_drop_output_buffer(self.handle)
         _check_alsa_error(err)
 
     def _event_input(self, prefer_bytes: bool = False) -> Tuple[int, Optional[Event]]:

@@ -22,6 +22,13 @@ def test_client_drop_output_nothing():
 
 
 @pytest.mark.require_alsa_seq
+def test_client_drop_output_buffer_nothing():
+    client = SequencerClient("test")
+    client.drop_output_buffer()
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
 def test_event_output(aseqdump):
 
     # prepare the client and port
