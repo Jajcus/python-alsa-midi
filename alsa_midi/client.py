@@ -658,6 +658,26 @@ class SequencerClientBase:
         _check_alsa_error(result)
         return event
 
+    def event_input_pending(self, fetch_sequencer: bool = False) -> int:
+        """Check events in input buffer.
+
+        If events remain on the input buffer of user-space, this method returns
+        the total byte size of events on it. If fetch_sequencer argument is
+        :data:`True`, this method checks the presence of events on sequencer FIFO
+        When events exist, they are transferred to the input buffer, and the
+        number of received events are returned. If fetch_sequencer argument is
+        zero and no events remain on the input buffer, function simply returns
+        zero.
+
+        Wraps :alsa:`snd_seq_event_input_pending`.
+
+        :param fetch_sequencer: check events pending on the kernel side too
+        """
+        self._check_handle()
+        result = alsa.snd_seq_event_input_pending(self.handle, int(fetch_sequencer))
+        _check_alsa_error(result)
+        return result
+
     def _prepare_event(self,
                        event: Event,
                        queue: Union['Queue', int] = None,
