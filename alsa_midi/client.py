@@ -867,6 +867,21 @@ class SequencerClientBase:
         _check_alsa_error(result)
         return result
 
+    def extract_output(self) -> Event:
+        """Extract the first event in output buffer.
+
+        Wraps :alsa:`snd_seq_extract_output`."""
+        self._check_handle()
+        buf = ffi.new("snd_seq_event_t**", ffi.NULL)
+        result = alsa.snd_seq_extract_output(self.handle, buf)
+        _check_alsa_error(result)
+        alsa_event = buf[0]
+        try:
+            cls = Event._specialized.get(buf[0].type, Event)
+            return cls._from_alsa(alsa_event)
+        finally:
+            alsa.snd_seq_free_event(alsa_event)
+
     def get_system_info(self) -> SystemInfo:
         """Obtain information about the sequencer.
 

@@ -1,9 +1,10 @@
 
+import errno
 import time
 
 import pytest
 
-from alsa_midi import READ_PORT, Address, NoteOffEvent, NoteOnEvent, SequencerClient
+from alsa_midi import READ_PORT, Address, ALSAError, NoteOffEvent, NoteOnEvent, SequencerClient
 
 
 @pytest.mark.require_alsa_seq
@@ -80,5 +81,37 @@ def test_event_output_pending():
     client.event_output(e2, port=port)
     pending3 = client.event_output_pending()
     assert pending3 > pending2
+
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_extract_output():
+
+    # prepare the client and port
+    client = SequencerClient("test")
+    port = client.create_port("output", READ_PORT)
+
+    e1 = NoteOnEvent(note=64)
+    e2 = NoteOffEvent(note=64)
+
+    with pytest.raises(ALSAError) as exc:
+        client.extract_output()
+    assert exc.value.errnum == -errno.ENOENT
+
+    client.event_output_buffer(e1, port=port)
+    client.event_output_buffer(e2, port=port)
+
+    ee1 = client.extract_output()
+    assert isinstance(ee1, NoteOnEvent)
+    assert ee1.note == 64
+
+    assert client.event_output_pending() > 0
+
+    ee2 = client.extract_output()
+    assert isinstance(ee2, NoteOffEvent)
+    assert ee2.note == 64
+
+    assert client.event_output_pending() == 0
 
     client.close()
