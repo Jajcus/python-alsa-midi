@@ -8,6 +8,7 @@ from statistics import mean
 from typing import Dict, List, Optional, Tuple
 
 import pytest
+import pytest_asyncio
 
 
 class AlsaPortState:
@@ -383,7 +384,7 @@ def aseqdump():
     return Aseqdump(process)
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def asyncio_latency_check(event_loop):
     class Latency:
         def __init__(self):
