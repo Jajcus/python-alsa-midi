@@ -2,8 +2,9 @@
 
 from ._ffi import alsa, ffi
 from .address import ALL_SUBSCRIBERS, SYSTEM_ANNOUNCE, SYSTEM_TIMER, Address
-from .client import (AsyncSequencerClient, ClientInfo, ClientPool, ClientType, SequencerClient,
-                     SequencerType, SubscriptionQuery, SubscriptionQueryType, SystemInfo)
+from .client import (AsyncSequencerClient, ClientInfo, ClientPool, ClientType, RemoveCondition,
+                     RemoveEvents, SequencerClient, SequencerType, SubscriptionQuery,
+                     SubscriptionQueryType, SystemInfo)
 from .event import (ActiveSensingEvent, BounceEvent, ChannelPressureEvent, ClientChangeEvent,
                     ClientExitEvent, ClientStartEvent, ClockEvent, ContinueEvent,
                     Control14BitChangeEvent, ControlChangeEvent, EchoEvent, Event, EventFlags,
@@ -24,7 +25,8 @@ from .queue import Queue, QueueInfo, QueueStatus, QueueTempo, QueueTimer, QueueT
 __all__ = [
         "Address", "ALL_SUBSCRIBERS", "SYSTEM_TIMER", "SYSTEM_ANNOUNCE",
         "SequencerClient", "AsyncSequencerClient", "ClientInfo", "ClientType", "SequencerType",
-        "SystemInfo", "SubscriptionQueryType", "SubscriptionQuery", "ClientPool",
+        "SystemInfo", "SubscriptionQueryType", "SubscriptionQuery", "ClientPool", "RemoveEvents",
+        "RemoveCondition",
         "RealTime", "EventType", "EventFlags", "Event", "MidiBytesEvent",
         "Error", "StateError", "ALSAError",
         "Port", "PortCaps", "PortType", "PortInfo",

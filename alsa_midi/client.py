@@ -12,7 +12,7 @@ from weakref import WeakValueDictionary
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
-from .event import MIDI_BYTES_EVENTS, Event, EventType, MidiBytesEvent, _snd_seq_event_t
+from .event import MIDI_BYTES_EVENTS, Event, EventType, MidiBytesEvent, RealTime, _snd_seq_event_t
 from .exceptions import StateError
 from .port import (DEFAULT_PORT_TYPE, READ_PORT_PREFERRED_TYPES, RW_PORT, RW_PORT_PREFERRED_TYPES,
                    WRITE_PORT_PREFERRED_TYPES, Port, PortCaps, PortInfo, PortType,
@@ -315,6 +315,33 @@ class ClientPool:
         alsa.snd_seq_client_pool_set_input_pool(pool, self.input_pool)
         alsa.snd_seq_client_pool_set_output_room(pool, self.output_room)
         return pool
+
+
+class RemoveCondition(IntFlag):
+    INPUT = alsa.SND_SEQ_REMOVE_INPUT
+    OUTPUT = alsa.SND_SEQ_REMOVE_OUTPUT
+    DEST = alsa.SND_SEQ_REMOVE_DEST
+    DEST_CHANNEL = alsa.SND_SEQ_REMOVE_DEST_CHANNEL
+    TIME_BEFORE = alsa.SND_SEQ_REMOVE_TIME_BEFORE
+    TIME_AFTER = alsa.SND_SEQ_REMOVE_TIME_AFTER
+    TIME_TICK = alsa.SND_SEQ_REMOVE_TIME_TICK
+    EVENT_TYPE = alsa.SND_SEQ_REMOVE_EVENT_TYPE
+    IGNORE_OFF = alsa.SND_SEQ_REMOVE_IGNORE_OFF
+    TAG_MATCH = alsa.SND_SEQ_REMOVE_TAG_MATCH
+
+
+@dataclass
+class RemoveEvents:
+    """Events removal condition.
+
+    Represents :alsa:`snd_seq_remove_events_t` data."""
+    condition: RemoveCondition = RemoveCondition(0)
+    queue_id: int = 0
+    time: Union[RealTime, int] = RealTime(0, 0)
+    dest: AddressType = Address(0, 0)
+    channel: int = 0
+    event_type: EventType = EventType.NONE
+    tag: int = 0
 
 
 class SequencerClientBase:
@@ -1444,6 +1471,129 @@ class SequencerClientBase:
         result = QueueStatus._from_alsa(status)
         return result
 
+    @overload
+    def remove_events(self, condition: RemoveEvents):
+        ...
+
+    @overload
+    def remove_events(self,
+                      condition: RemoveCondition = None,
+                      queue: Union[Queue, int] = None,
+                      time: RealTime = None,
+                      dest: AddressType = None,
+                      channel: int = None,
+                      event_type: EventType = None,
+                      tag: int = None,
+                      before: bool = False,
+                      ignore_off: bool = None,
+                      ):
+        ...
+
+    def remove_events(self,
+                      condition: Union[RemoveEvents, RemoveCondition] = None,
+                      queue: Union[Queue, int] = None,
+                      time: Union[RealTime, int] = None,
+                      dest: AddressType = None,
+                      channel: int = None,
+                      event_type: EventType = None,
+                      tag: int = None,
+                      before: bool = False,
+                      ignore_off: bool = None,
+                      ):
+        """Remove selected from output and/or input buffers.
+
+        Wraps :alsa:`snd_seq_remove_events`.
+
+        Note: while this wraps complete ALSA 'remove events' API a lot of
+        possible conditions are not actually implemented in ALSA, especially on
+        the kernel side.
+
+        :param condition: Condition flags. Additional flags will be added, as
+                          needed when other arguments are provided. Can also be
+                          a RemoveEvents objects, to describe whole ALSA
+                          condition.
+        :param queue: Queue (object or id). Seems to be ignored by ALSA.
+        :param time: Time (real or tick) to compare event timestamps to.
+        :param dest: Destination address
+        :param channel: MIDI channel number
+        :param event_type: type of events to remove
+        :param tag: event tag to matching
+        :param before: match events before specified time
+        :param ignore_off: do not remove Note Off events
+        """
+
+        if (isinstance(condition, RemoveEvents)
+                and any((queue, time, dest, channel, event_type, tag))):
+            raise TypeError("condition must not be RemoveEvents object when using other arguments")
+        self._check_handle()
+        cond_p = ffi.new("snd_seq_remove_events_t **")
+        err = alsa.snd_seq_remove_events_malloc(cond_p)
+        _check_alsa_error(err)
+        a_cond = ffi.gc(cond_p[0], alsa.snd_seq_remove_events_free)
+        if isinstance(condition, RemoveEvents):
+            cond_bits = condition.condition
+            queue_id = condition.queue_id
+            time = condition.time
+            dest = condition.dest
+            channel = condition.channel
+            event_type = condition.event_type
+            tag = condition.tag
+        else:
+            if condition is None:
+                cond_bits = RemoveCondition(0)
+            else:
+                cond_bits = condition
+            if dest is not None:
+                cond_bits |= RemoveCondition.DEST
+            if channel is not None:
+                cond_bits |= RemoveCondition.DEST_CHANNEL
+            if time is not None:
+                if before:
+                    cond_bits |= RemoveCondition.TIME_BEFORE
+                else:
+                    cond_bits |= RemoveCondition.TIME_AFTER
+                if isinstance(time, int):
+                    cond_bits |= RemoveCondition.TIME_TICK
+            if event_type is not None:
+                cond_bits |= RemoveCondition.EVENT_TYPE
+            if tag is not None:
+                cond_bits |= RemoveCondition.TAG_MATCH
+            if ignore_off:
+                cond_bits |= RemoveCondition.IGNORE_OFF
+            if isinstance(queue, int):
+                queue_id = queue
+            elif queue is not None:
+                queue_id = queue.queue_id
+            else:
+                queue_id = None
+
+        alsa.snd_seq_remove_events_set_condition(a_cond, cond_bits)
+        if queue_id is not None:
+            alsa.snd_seq_remove_events_set_queue(a_cond, queue_id)
+        if time is not None:
+            a_time = ffi.new("snd_seq_timestamp_t *")
+            if isinstance(time, RealTime):
+                a_time.time.tv_sec = time.seconds
+                a_time.time.tv_nsec = time.nanoseconds
+            else:
+                a_time.tick = time
+            alsa.snd_seq_remove_events_set_time(a_cond, a_time)
+        if dest is not None:
+            dest = Address(dest)
+            a_dest = ffi.new("snd_seq_addr_t *")
+            a_dest.client = dest.client_id
+            a_dest.port = dest.port_id
+            alsa.snd_seq_remove_events_set_dest(a_cond, a_dest)
+        if channel is not None:
+            alsa.snd_seq_remove_events_set_channel(a_cond, channel)
+        if event_type is not None:
+            alsa.snd_seq_remove_events_set_event_type(a_cond, event_type)
+        if tag is not None:
+            alsa.snd_seq_remove_events_set_tag(a_cond, tag)
+        result = alsa.snd_seq_remove_events(self.handle, a_cond)
+        _check_alsa_error(result)
+        return result
+
 
 class SequencerClient(SequencerClientBase):
     """ALSA sequencer client connection.
@@ -1787,4 +1937,5 @@ class AsyncSequencerClient(SequencerClientBase):
 
 
 __all__ = ["SequencerClientBase", "SequencerClient", "ClientInfo", "ClientType", "SequencerType",
-           "SystemInfo", "SubscriptionQueryType", "SubscriptionQuery", "ClientPool"]
+           "SystemInfo", "SubscriptionQueryType", "SubscriptionQuery", "ClientPool",
+           "RemoveEvents", "RemoveCondition"]
