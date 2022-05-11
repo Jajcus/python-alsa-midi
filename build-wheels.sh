@@ -57,6 +57,10 @@ for PYBIN in /opt/python/cp{37,38,39,310}*/bin; do
     [ -d "$PYBIN" ] || continue
     "${PYBIN}/pip" install --upgrade pip setuptools
     "${PYBIN}/pip" install -r "$GITHUB_WORKSPACE/requirements.txt"
+
+    pwd
+    ls -la
+
     "${PYBIN}/pip" wheel "$GITHUB_WORKSPACE" --no-deps -w wheelhouse/
 done
 
