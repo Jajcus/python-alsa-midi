@@ -52,6 +52,8 @@ else
 	fi
 fi
 
+# stop git from panicing because this is run as root
+# as it breaks setuptools_scm
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
 # Compile wheels
@@ -59,12 +61,6 @@ for PYBIN in /opt/python/cp{37,38,39,310}*/bin; do
     [ -d "$PYBIN" ] || continue
     "${PYBIN}/pip" install --upgrade pip setuptools
     "${PYBIN}/pip" install -r "$GITHUB_WORKSPACE/requirements.txt"
-
-    pwd
-    ls -la
-    git status
-    git tag -l
-    git describe
 
     "${PYBIN}/pip" wheel "$GITHUB_WORKSPACE" --no-deps -w wheelhouse/
 done
