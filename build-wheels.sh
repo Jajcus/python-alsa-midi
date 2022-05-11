@@ -60,6 +60,9 @@ for PYBIN in /opt/python/cp{37,38,39,310}*/bin; do
 
     pwd
     ls -la
+    git status
+    git tag -l
+    git describe
 
     "${PYBIN}/pip" wheel "$GITHUB_WORKSPACE" --no-deps -w wheelhouse/
 done
