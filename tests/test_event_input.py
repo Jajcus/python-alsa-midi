@@ -40,6 +40,9 @@ def test_event_input():
     cmd = ["aplaymidi", "-p", str(Address(port)), "-d", "0", filename]
     player = subprocess.Popen(cmd)
 
+    # give it a bit time to start, the VM might be slow
+    time.sleep(0.5)
+
     events = []
     for _ in range(18):
         event = client.event_input(timeout=1)
@@ -83,6 +86,9 @@ def test_event_input_bytes():
 
     event = client.event_input(timeout=1, prefer_bytes=True)
     assert isinstance(event, PortSubscribedEvent)
+
+    # give it a bit time to start, the VM might be slow
+    time.sleep(0.5)
 
     for _ in range(8):
         event = client.event_input(timeout=1, prefer_bytes=True)

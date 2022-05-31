@@ -40,6 +40,9 @@ async def test_event_input(asyncio_latency_check):
     filename = os.path.join(DATA_DIR, "c_major.mid")
     cmd = ["aplaymidi", "-p", str(Address(port)), "-d", "0", filename]
     player = subprocess.Popen(cmd)
+
+    # give it a bit time to start, the VM might be slow
+    await asyncio.sleep(0.5)
     await asyncio_latency_check.cont()
 
     events = []
