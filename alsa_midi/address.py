@@ -70,6 +70,8 @@ class Address(namedtuple("Address", "client_id port_id")):
             tple: Any = (client_id, port_id)
             return tuple.__new__(cls, tple)
         elif isinstance(arg1, tuple):
+            if len(arg1) != 2:
+                raise ValueError("Wrong tuple length")
             tple: Any = (int(v) if v is not None else 0 for v in arg1)
             return tuple.__new__(cls, tple)
         else:
