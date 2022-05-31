@@ -1,5 +1,9 @@
 
-from alsa_midi import Address
+import errno
+
+import pytest
+
+from alsa_midi import Address, ALSAError
 
 
 def test_construct_int():
@@ -16,6 +20,11 @@ def test_construct_int_int():
     assert addr.port_id == 2
 
 
+def test_construct_int_str():
+    with pytest.raises(ValueError):
+        Address(129, "x")  # type: ignore
+
+
 def test_construct_tuple():
     addr = Address((1, 2))
     assert isinstance(addr, Address)
@@ -23,11 +32,32 @@ def test_construct_tuple():
     assert addr.port_id == 2
 
 
+def test_construct_tuple_str():
+    with pytest.raises(ValueError):
+        Address(("x", "y"))  # type: ignore
+
+
+def test_construct_tuple_too_long():
+    with pytest.raises(ValueError):
+        Address((1, 2, 3))  # type: ignore
+
+
+def test_construct_tuple_too_short():
+    with pytest.raises(ValueError):
+        Address((1,))  # type: ignore
+
+
 def test_construct_string():
     addr = Address("130:10")
     assert isinstance(addr, Address)
     assert addr.client_id == 130
     assert addr.port_id == 10
+
+
+def test_construct_string_bad():
+    with pytest.raises(ALSAError) as err:
+        Address("x:y")
+    assert err.value.errnum == -errno.EINVAL
 
 
 def test_copy():
