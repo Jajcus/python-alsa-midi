@@ -95,7 +95,7 @@ def get_devices(*args, **kwargs):
 def _find_port(ports: List[alsa_midi.PortInfo], name: str) -> alsa_midi.PortInfo:
     try:
         addr = alsa_midi.Address(name)
-    except ValueError:
+    except (ValueError, alsa_midi.exceptions.ALSAError):
         addr = None
 
     if addr is not None:
