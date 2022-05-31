@@ -1796,6 +1796,8 @@ class AsyncSequencerClient(SequencerClientBase):
         fd = self._fd
 
         def reader_cb():
+            if fut.done():
+                return
             result = None
             try:
                 result, event = self._event_input(prefer_bytes=prefer_bytes)
@@ -1839,6 +1841,8 @@ class AsyncSequencerClient(SequencerClientBase):
         fd = self._fd
 
         def writer_cb():
+            if fut.done():
+                return
             nonlocal remainder
             result = None
             try:
