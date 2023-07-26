@@ -30,7 +30,7 @@ class RealTime:
     seconds: int
     nanoseconds: int
 
-    def __init__(self, seconds: Union[float, int, str, 'RealTime'], nanoseconds: int = 0):
+    def __init__(self, seconds: Union[float, int, str, 'RealTime'] = 0, nanoseconds: int = 0):
         if isinstance(seconds, RealTime):
             self.seconds = seconds.seconds
             self.nanoseconds = seconds.nanoseconds + nanoseconds

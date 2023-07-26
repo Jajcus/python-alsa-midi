@@ -1,5 +1,5 @@
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import TYPE_CHECKING, NamedTuple, NewType, Optional, Union
 
@@ -86,7 +86,7 @@ class QueueStatus:
     queue_id: int = 0
     events: int = 0
     tick_time: int = 0
-    real_time: RealTime = RealTime(0, 0)
+    real_time: RealTime = field(default_factory=RealTime)
     status: int = 0
 
     @classmethod

@@ -3,7 +3,7 @@ import asyncio
 import errno
 import select
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
 from functools import partial
 from typing import (Any, Callable, List, MutableMapping, NewType, Optional, Set, Tuple, Union,
@@ -337,7 +337,7 @@ class RemoveEvents:
     Represents :alsa:`snd_seq_remove_events_t` data."""
     condition: RemoveCondition = RemoveCondition(0)
     queue_id: int = 0
-    time: Union[RealTime, int] = RealTime(0, 0)
+    time: Union[RealTime, int] = field(default_factory=RealTime)
     dest: AddressType = Address(0, 0)
     channel: int = 0
     event_type: EventType = EventType.NONE
