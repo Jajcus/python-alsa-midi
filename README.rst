@@ -17,7 +17,7 @@ Features
   * Access to non-MIDI events, like announcements about new clients, ports and
     connections
 
-* Python 3.7 – 3.10 compatibility
+* Python 3.7 – 3.11 compatibility
 
 * Both synchronous (blocking) and asynchronous (asyncio) I/O
 
