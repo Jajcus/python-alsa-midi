@@ -16,4 +16,9 @@ Vagrant.configure("2") do |config|
     config.vm.synced_folder ".", "/vagrant"
 
     config.vm.provision "shell", inline: $script
+
+    # very slow, but KVM is not available on default GitHub runners
+    config.vm.provider :libvirt do |libvirt|
+      libvirt.driver = "qemu"
+    end
 end

@@ -63,10 +63,18 @@ jobs:
       run: "tox -e py -- -vv"
 
   test-on-alsa-kernel:
-    runs-on: macos-10.15
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: Install vagrant
+      run: |
+        sudo apt update
+        sudo apt install -y vagrant libvirt-daemon libvirt-daemon-driver-qemu libvirt-clients libvirt-daemon-system
+        sudo systemctl
+        sudo systemctl status libvirtd.service
+        sudo chmod a+rw /var/run/libvirt/libvirt-sock
 
     - name: Cache Vagrant boxes
       uses: actions/cache@v2
