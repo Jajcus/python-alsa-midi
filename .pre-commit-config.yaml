@@ -1,11 +1,11 @@
 repos:
-- repo: https://gitlab.com/pycqa/flake8
-  rev: '3.8.3'
+- repo: https://github.com/pycqa/flake8
+  rev: '7.0.0'
   hooks:
     - id: flake8
       exclude: pbx_api_client/v1
 - repo: https://github.com/pycqa/isort
-  rev: 5.10.1
+  rev: 5.13.2
   hooks:
     - id: isort
       name: isort (python)
