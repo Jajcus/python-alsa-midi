@@ -22,7 +22,5 @@ Vagrant.configure("2") do |config|
 
     config.vm.provider :libvirt do |libvirt|
       libvirt.memory = 3072
-      # very slow, but KVM was (is) not available on default GitHub runners
-      #libvirt.driver = "qemu"
     end
 end
