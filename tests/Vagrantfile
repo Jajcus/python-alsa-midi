@@ -3,22 +3,26 @@
 
 $script = <<-'SCRIPT'
   sudo apt update
-  sudo apt install -y python3-cffi python3-venv python3-pip libffi-dev libasound-dev alsa-utils
-  export PATH="$PATH:$HOME/.local/bin"
-  pip3 install tox
+  sudo apt install -y python3-cffi python3-venv python3-pip python3-wheel python3-venv libffi-dev libasound-dev alsa-utils
+  python3 -m venv /venv
+  /venv/bin/python3 -mpip install --upgrade pip
+  /venv/bin/python3 -mpip install tox
 SCRIPT
 
 Vagrant.configure("2") do |config|
-    config.vm.box = "generic/debian10"
+    config.vm.box = "generic/debian12"
 
     config.vm.define 'vm'
 
-    config.vm.synced_folder ".", "/vagrant"
+    config.vm.synced_folder ".", "/vagrant",
+        nfs: true,
+        nfs_udp: false
 
     config.vm.provision "shell", inline: $script
 
-    # very slow, but KVM is not available on default GitHub runners
     config.vm.provider :libvirt do |libvirt|
-      libvirt.driver = "qemu"
+      libvirt.memory = 3072
+      # very slow, but KVM was (is) not available on default GitHub runners
+      #libvirt.driver = "qemu"
     end
 end

@@ -72,8 +72,6 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y vagrant libvirt-daemon libvirt-daemon-driver-qemu libvirt-clients libvirt-daemon-system
-        sudo systemctl
-        sudo systemctl status libvirtd.service
         sudo chmod a+rw /var/run/libvirt/libvirt-sock
 
     - name: Cache Vagrant boxes
@@ -91,7 +89,7 @@ jobs:
 
     - name: Run tests in vagrant vm
       run: |
-        vagrant ssh vm -c 'cd /vagrant && PATH="$PATH:$HOME/.local/bin" && tox -e py -- -vv'
+        vagrant ssh vm -c 'cd /vagrant && /venv/bin/tox -e py -- -vv'
 
 
   build-pure:
