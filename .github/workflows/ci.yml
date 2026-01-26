@@ -66,31 +66,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Install vagrant
+    - name: Install Multipass
       run: |
-        sudo apt update
-        sudo apt install -y vagrant libvirt-daemon libvirt-daemon-driver-qemu libvirt-clients libvirt-daemon-system
-        sudo chmod a+rw /var/run/libvirt/libvirt-sock
+        sudo snap install multipass --classic
+        sudo snap wait system seed.loaded
+        sleep 5
 
-    - name: Cache Vagrant boxes
-      uses: actions/cache@v3
-      with:
-        path: ~/.vagrant.d/boxes
-        key: ${{ runner.os }}-vagrant-${{ hashFiles('Vagrantfile') }}
-        restore-keys: |
-          ${{ runner.os }}-vagrant-
-
-    - name: Start vagrant VM
+    - name: Start Multipass VM
       run: |
-        cp tests/Vagrantfile .
-        vagrant up
+        sudo multipass launch 24.04 -n test-vm
+        sleep 10
 
-    - name: Run tests in vagrant vm
+    - name: Run tests in Multipass VM
       run: |
-        vagrant ssh vm -c 'cd /vagrant && /venv/bin/tox -e py -- -vv'
+        set -x
+        sudo multipass exec test-vm -- sudo modprobe snd-seq-device
+        sudo multipass exec test-vm -- sudo modprobe snd-seq-dummy
+        sudo multipass exec test-vm -- sudo modprobe snd-rawmidi
+        sudo multipass exec test-vm -- sudo sh -c 'chmod a+rw /dev/snd/*'
+        sudo multipass transfer --recursive $PWD test-vm:/home/ubuntu/code
+        sudo multipass exec test-vm -- sudo apt install -y python3-cffi python3-venv python3-pip python3-wheel python3-venv libffi-dev libasound-dev alsa-utils
+        curl -LsSf https://astral.sh/uv/install.sh | sudo multipass exec test-vm -- sh
+        sudo multipass exec test-vm -- bash -c '. $HOME/.local/bin/env && cd code && uvx tox -e py -- -vv'
 
+    - name: Stop and delete VM
+      run: |
+        sudo multipass stop test-vm
+        sudo multipass delete test-vm
+        sudo multipass purge
 
   build-pure:
 
