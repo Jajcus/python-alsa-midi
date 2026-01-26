@@ -128,7 +128,7 @@ jobs:
         twine check dist/*
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: dist-pure
         path: dist
@@ -155,7 +155,7 @@ jobs:
         args: ./build-wheels.sh manylinux_2_12_x86_64
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: wheelhouse-manylinux_2_12_x86_64
         path: wheelhouse
@@ -180,7 +180,7 @@ jobs:
         args: linux32 ./build-wheels.sh manylinux_2_12_i686
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: wheelhouse-manylinux_2_12_i686
         path: wheelhouse
@@ -205,7 +205,7 @@ jobs:
         args: ./build-wheels.sh manylinux_2_17_x86_64
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: wheelhouse-manylinux_2_17_x86_64
         path: wheelhouse
@@ -230,7 +230,7 @@ jobs:
         args: linux32 ./build-wheels.sh manylinux_2_17_i686
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: wheelhouse-manylinux_2_17_i686
         path: wheelhouse
@@ -255,7 +255,7 @@ jobs:
         args: ./build-wheels.sh manylinux_2_28_x86_64
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: wheelhouse-manylinux_2_28_x86_64
         path: wheelhouse
