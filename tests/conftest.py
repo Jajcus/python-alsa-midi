@@ -43,13 +43,15 @@ class AlsaClientState:
     client_id: int
     name: str
     type: str
+    version: Optional[str]
     ports: Dict[int, AlsaPortState]
     queues: Dict[int, 'AlsaQueueState']
 
-    def __init__(self, client_id, name, client_type):
+    def __init__(self, client_id, name, client_type, midi_version):
         self.client_id = client_id
         self.name = name
         self.type = client_type
+        self.version = midi_version
         self.ports = {}
         self.queues = {}
 
@@ -130,7 +132,7 @@ class AlsaQueueState:
 
 PROC_MAX_CLIENTS_LINE_RE = re.compile(r'\s+max\s+clients\s*:\s*(\d+)')
 PROC_CUR_CLIENTS_LINE_RE = re.compile(r'\s+cur\s+clients\s*:\s*(\d+)')
-PROC_CLIENT_LINE_RE = re.compile(r'Client\s+(\d+)\s*:\s*\"([^"]*)"\s+\[([^\]]*)\]')
+PROC_CLIENT_LINE_RE = re.compile(r'Client\s+(\d+)\s*:\s*\"([^"]*)"\s+\[([^ \]]*)(?: ([^\]]*))?\]')
 PROC_PORT_LINE_RE = re.compile(r'\s+Port\s+(\d+)\s*:\s*\"([^"]*)"\s+\(([^\)]*)\)')
 PROC_CONN_TO_LINE_RE = re.compile(r'\s+Connecting To:\s*(\S.*)$')
 PROC_CONN_FROM_LINE_RE = re.compile(r'\s+Connected From:\s*(\S.*)$')
@@ -171,10 +173,12 @@ class AlsaSequencerState:
         self.ports = {}
         self.queues = {}
 
+        print("clients:")
         with open("/proc/asound/seq/clients", "r") as proc_f:
             client = None
             port = None
             for line in proc_f:
+                print(repr(line))
                 match = PROC_MAX_CLIENTS_LINE_RE.match(line)
                 if match:
                     self.max_clients = int(match.group(1))
@@ -183,7 +187,10 @@ class AlsaSequencerState:
                     self.cur_clients = int(match.group(1))
                 match = PROC_CLIENT_LINE_RE.match(line)
                 if match:
-                    client = AlsaClientState(int(match.group(1)), match.group(2), match.group(3))
+                    client = AlsaClientState(int(match.group(1)),
+                                             match.group(2),
+                                             match.group(3),
+                                             match.group(4))
                     self.clients[client.client_id] = client
                     port = None
                     continue
@@ -207,10 +214,12 @@ class AlsaSequencerState:
                     port.connected_from = parse_port_list(match.group(1))
                     continue
 
+        print("queues:")
         with open("/proc/asound/seq/queues", "r") as proc_f:
             queues = []
             queue_lines = []
             for line in proc_f:
+                print(repr(line))
                 if not line.strip():
                     if queue_lines:
                         queues.append(AlsaQueueState(queue_lines))
@@ -225,6 +234,8 @@ class AlsaSequencerState:
                     self.clients[queue.client_id].queues[queue.queue_id] = queue
                 except KeyError:
                     pass
+
+        print(self)
 
 
 @pytest.fixture
