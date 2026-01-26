@@ -385,9 +385,10 @@ def aseqdump():
 
 
 @pytest_asyncio.fixture
-async def asyncio_latency_check(event_loop):
+async def asyncio_latency_check():
     class Latency:
         def __init__(self):
+            event_loop = asyncio.get_running_loop()
             self.start_time = event_loop.time()
             self.min = None
             self.max = None
@@ -439,6 +440,7 @@ async def asyncio_latency_check(event_loop):
                 await self.cond.wait_for(lambda: self.stopped)
 
         async def _loop(self, step=0.01):
+            event_loop = asyncio.get_running_loop()
             try:
                 while True:
                     async with self.cond:
