@@ -548,6 +548,8 @@ class SequencerClientBase:
                     queue_id = timestamp_queue.queue_id
                 alsa.snd_seq_port_info_set_timestamp_queue(info, queue_id)
             port = alsa.snd_seq_create_port(self.handle, info)
+            if port == 0:
+                port = alsa.snd_seq_port_info_get_port(info)
         _check_alsa_error(port)
         return Port(self, port)
 

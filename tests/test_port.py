@@ -26,6 +26,26 @@ def test_port_create_close():
 
 
 @pytest.mark.require_alsa_seq
+def test_port_create_extra_close():
+    client = SequencerClient("test_c")
+    port1 = client.create_port("test_p1")  # allocate port_id=0 here
+    port2 = client.create_port("test_p2", midi_channels=2, midi_voices=3, synth_voices=4)
+
+    assert isinstance(port2, Port)
+    assert port2.client is client
+    assert port2.port_id != port1.port_id  # old code would always return port_id=0
+
+    port1.close()
+    port2.close()
+
+    assert port1.client is None
+    assert port2.client is None
+
+    # should do nothing now
+    del port2
+
+
+@pytest.mark.require_alsa_seq
 def test_port_create_del():
     client = SequencerClient("test_c")
     port = client.create_port("test_p")
@@ -52,6 +72,29 @@ def test_port_create_close_alsa(alsa_seq_state):
 
     alsa_seq_state.load()
     assert (port.client_id, port.port_id) not in alsa_seq_state.ports
+
+
+@pytest.mark.require_alsa_seq
+def test_port_create_extra_close_alsa(alsa_seq_state):
+    client = SequencerClient("test_c")
+
+    # allocate port_id=0 here, so we can check for the proper number later
+    port1 = client.create_port("test_p1")
+    port = client.create_port("test_p", midi_channels=2, midi_voices=3, synth_voices=4)
+
+    alsa_seq_state.load()
+    assert (port.client_id, port.port_id) in alsa_seq_state.ports
+    alsa_port = alsa_seq_state.ports[port.client_id, port.port_id]
+
+    assert alsa_port.name == "test_p"
+    assert "RWe" in alsa_port.flags
+
+    port.close()
+
+    alsa_seq_state.load()
+    assert (port.client_id, port.port_id) not in alsa_seq_state.ports
+
+    del port1
 
 
 @pytest.mark.require_alsa_seq
