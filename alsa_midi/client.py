@@ -634,6 +634,15 @@ class SequencerClientBase:
         err = alsa.snd_seq_drain_output(self.handle)
         _check_alsa_error(err)
 
+    def sync_output_queue(self):
+        """Wait until all events are processed.
+
+        Wraps :alsa:`snd_seq_sync_output_queue`.
+        """
+        self._check_handle()
+        err = alsa.snd_seq_sync_output_queue(self.handle)
+        _check_alsa_error(err)
+
     def drop_output(self):
         """Remove all events from the output buffer (client and kernel side).
 
