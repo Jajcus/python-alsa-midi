@@ -59,6 +59,10 @@ git config --global --add safe.directory "$GITHUB_WORKSPACE"
 # Compile wheels
 for PYBIN in /opt/python/cp{39,310,311,312,313,314}*/bin; do
     [ -d "$PYBIN" ] || continue
+    if [[ "$PYBIN" =~ 313t ]] ; then
+      echo "Skipping 313t variant, as it is incompatible with cffi"
+      continue
+    fi
     "${PYBIN}/pip" install --upgrade pip setuptools
     "${PYBIN}/pip" install -r "$GITHUB_WORKSPACE/requirements.txt"
 
@@ -78,6 +82,10 @@ rm wheelhouse/*-linux_*.whl
 cd /
 for PYBIN in /opt/python/cp{39,310,311,312,313,314}*/bin/; do
     [ -d "$PYBIN" ] || continue
+    if [[ "$PYBIN" =~ 313t ]] ; then
+      echo "Skipping 313t variant, as it is incompatible with cffi"
+      continue
+    fi
 
     "${PYBIN}/pip" install pytest pytest-asyncio
     "${PYBIN}/pip" install alsa-midi --no-index -f "$GITHUB_WORKSPACE/wheelhouse/"
