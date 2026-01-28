@@ -13,7 +13,8 @@ import logging
 import queue
 import sys
 import threading
-from typing import Any, Callable, List, MutableMapping, Optional
+from collections.abc import MutableMapping
+from typing import Any, Callable, Optional
 from weakref import WeakValueDictionary
 
 from mido.messages import Message
@@ -92,7 +93,7 @@ def get_devices(*args, **kwargs):
     return client.get_devices(*args, **kwargs)
 
 
-def _find_port(ports: List[alsa_midi.PortInfo], name: str) -> alsa_midi.PortInfo:
+def _find_port(ports: list[alsa_midi.PortInfo], name: str) -> alsa_midi.PortInfo:
     try:
         addr = alsa_midi.Address(name)
     except (ValueError, alsa_midi.exceptions.ALSAError):
@@ -104,7 +105,7 @@ def _find_port(ports: List[alsa_midi.PortInfo], name: str) -> alsa_midi.PortInfo
             if addr == alsa_midi.Address(port):
                 return port
         else:
-            raise IOError(f"unknown port {name!r}")
+            raise OSError(f"unknown port {name!r}")
 
     # check for exact match with name from get_devices()
     for port in ports:
@@ -128,10 +129,10 @@ def _find_port(ports: List[alsa_midi.PortInfo], name: str) -> alsa_midi.PortInfo
         if name == port.name:
             return port
 
-    raise IOError(f"unknown port {name!r}")
+    raise OSError(f"unknown port {name!r}")
 
 
-class PortCommon(object):
+class PortCommon:
     _last_num = 0
     _name_prefix = "inout"
     _caps = alsa_midi.PortCaps.READ | alsa_midi.PortCaps.WRITE
@@ -182,7 +183,7 @@ class PortCommon(object):
             ports = client.client.list_ports(input=self._for_input, output=self._for_output)
 
             if not ports:
-                raise IOError('no ports available')
+                raise OSError('no ports available')
 
             if self.name is None:
                 dest_port = ports[0]
@@ -200,9 +201,9 @@ class PortCommon(object):
         self._dest_port = dest_port
 
         api = 'seq'
-        self._device_type = 'AlsaMidi/{}'.format(api)
+        self._device_type = f'AlsaMidi/{api}'
         if virtual:
-            self._device_type = 'virtual {}'.format(self._device_type)
+            self._device_type = f'virtual {self._device_type}'
 
         client.ports[self._port.port_id] = self
 

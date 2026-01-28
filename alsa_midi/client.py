@@ -1,13 +1,12 @@
-
 import asyncio
 import errno
 import select
 import time
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
 from functools import partial
-from typing import (Any, Callable, List, MutableMapping, NewType, Optional, Set, Tuple, Union,
-                    overload)
+from typing import Any, Callable, NewType, Optional, Union, overload
 from weakref import WeakValueDictionary
 
 from ._ffi import alsa, ffi
@@ -21,7 +20,7 @@ from .queue import Queue, QueueInfo, QueueStatus
 from .util import _check_alsa_error
 
 _snd_seq_t = NewType("_snd_seq_t", object)
-_snd_seq_t_p = NewType("_snd_seq_t_p", Tuple[_snd_seq_t])
+_snd_seq_t_p = NewType("_snd_seq_t_p", tuple[_snd_seq_t])
 _snd_midi_event_t = NewType("_snd_midi_event_t", object)
 
 
@@ -90,7 +89,7 @@ class ClientInfo:
     pid: Optional[int] = None
     num_ports: int = 0
     event_lost: int = 0
-    event_filter: Optional[Set[EventType]] = None
+    event_filter: Optional[set[EventType]] = None
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_client_info_t):
@@ -661,7 +660,7 @@ class SequencerClientBase:
         err = alsa.snd_seq_drop_output_buffer(self.handle)
         _check_alsa_error(err)
 
-    def _event_input(self, prefer_bytes: bool = False) -> Tuple[int, Optional[Event]]:
+    def _event_input(self, prefer_bytes: bool = False) -> tuple[int, Optional[Event]]:
         buf = ffi.new("snd_seq_event_t**", ffi.NULL)
         result = alsa.snd_seq_event_input(self.handle, buf)
         if result < 0:
@@ -730,7 +729,7 @@ class SequencerClientBase:
                        queue: Union['Queue', int] = None,
                        port: Union['Port', int] = None,
                        dest: AddressType = None,
-                       remainder: Optional[Any] = None) -> Tuple[_snd_seq_event_t, Any]:
+                       remainder: Optional[Any] = None) -> tuple[_snd_seq_event_t, Any]:
         """Prepare ALSA :alsa:`snd_seq_event_t` for given `event` object for output.
 
         For :class:`alsa_midi.MidiBytesEvent` may need to be called more than
@@ -780,7 +779,7 @@ class SequencerClientBase:
                       queue: Union['Queue', int] = None,
                       port: Union['Port', int] = None,
                       dest: AddressType = None,
-                      remainder: Optional[Any] = None) -> Tuple[int, Any]:
+                      remainder: Optional[Any] = None) -> tuple[int, Any]:
         alsa_event, remainder = self._prepare_event(event,
                                                     queue=queue, port=port, dest=dest,
                                                     remainder=remainder)
@@ -864,7 +863,7 @@ class SequencerClientBase:
                              queue: Union['Queue', int] = None,
                              port: Union['Port', int] = None,
                              dest: AddressType = None,
-                             remainder: Optional[Any] = None) -> Tuple[int, Any]:
+                             remainder: Optional[Any] = None) -> tuple[int, Any]:
         alsa_event, remainder = self._prepare_event(event,
                                                     queue=queue, port=port, dest=dest,
                                                     remainder=remainder)
@@ -1114,7 +1113,7 @@ class SequencerClientBase:
                    include_no_export: bool = True,
                    only_connectable: bool = True,
                    sort: Union[bool, Callable[[PortInfo], Any]] = True,
-                   ) -> List[PortInfo]:
+                   ) -> list[PortInfo]:
         """More friendly interface to list available ports.
 
         Queries ALSA for all clients and ports and returns those matching the selected criteria.
@@ -1327,7 +1326,7 @@ class SequencerClientBase:
     def list_port_subscribers(self,
                               port: AddressType,
                               type: Optional[SubscriptionQueryType] = None,
-                              ) -> List[SubscriptionQuery]:
+                              ) -> list[SubscriptionQuery]:
         """Lists subscribers accessing a port.
 
         Wraps :alsa:`snd_seq_query_port_subscribers`.

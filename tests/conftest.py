@@ -1,11 +1,10 @@
-
 import asyncio
 import os
 import re
 import subprocess
 import sys
 from statistics import mean
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import pytest
 import pytest_asyncio
@@ -16,8 +15,8 @@ class AlsaPortState:
     port_id: int
     name: str
     flags: str
-    connected_from: List[Tuple[int, int]]
-    connected_to: List[Tuple[int, int]]
+    connected_from: list[tuple[int, int]]
+    connected_to: list[tuple[int, int]]
 
     def __init__(self, client_id, port_id, name, flags):
         self.client_id = client_id
@@ -44,8 +43,8 @@ class AlsaClientState:
     name: str
     type: str
     version: Optional[str]
-    ports: Dict[int, AlsaPortState]
-    queues: Dict[int, 'AlsaQueueState']
+    ports: dict[int, AlsaPortState]
+    queues: dict[int, 'AlsaQueueState']
 
     def __init__(self, client_id, name, client_type, midi_version):
         self.client_id = client_id
@@ -80,7 +79,7 @@ class AlsaQueueState:
     timer_ppq: int
     current_tempo: int
     current_bpm: int
-    current_time: Tuple[int, int]
+    current_time: tuple[int, int]
     current_tick: int
 
     def __init__(self, lines):
@@ -138,7 +137,7 @@ PROC_CONN_TO_LINE_RE = re.compile(r'\s+Connecting To:\s*(\S.*)$')
 PROC_CONN_FROM_LINE_RE = re.compile(r'\s+Connected From:\s*(\S.*)$')
 
 
-def parse_port_list(string: str) -> List[Tuple[int, int]]:
+def parse_port_list(string: str) -> list[tuple[int, int]]:
     port_list = [p.strip() for p in string.split(",")]
     port_list = [p.split("[", 1)[0] for p in port_list]
     port_list = [p.split(":", 1) for p in port_list]
@@ -147,9 +146,9 @@ def parse_port_list(string: str) -> List[Tuple[int, int]]:
 
 
 class AlsaSequencerState:
-    clients: Dict[int, AlsaClientState]
-    ports: Dict[Tuple[int, int], AlsaPortState]
-    queues: Dict[int, AlsaQueueState]
+    clients: dict[int, AlsaClientState]
+    ports: dict[tuple[int, int], AlsaPortState]
+    queues: dict[int, AlsaQueueState]
     max_clients: int
     cur_clients: int
 
@@ -174,7 +173,7 @@ class AlsaSequencerState:
         self.queues = {}
 
         print("clients:")
-        with open("/proc/asound/seq/clients", "r") as proc_f:
+        with open("/proc/asound/seq/clients") as proc_f:
             client = None
             port = None
             for line in proc_f:
@@ -215,7 +214,7 @@ class AlsaSequencerState:
                     continue
 
         print("queues:")
-        with open("/proc/asound/seq/queues", "r") as proc_f:
+        with open("/proc/asound/seq/queues") as proc_f:
             queues = []
             queue_lines = []
             for line in proc_f:
@@ -247,10 +246,10 @@ alsa_seq_present = os.path.exists("/proc/asound/seq/clients")
 if not alsa_seq_present:
     try:
         # try triggering snd-seq module load
-        with open("/dev/snd/seq", "r"):
+        with open("/dev/snd/seq"):
             pass
         alsa_seq_present = os.path.exists("/proc/asound/seq/clients")
-    except IOError:
+    except OSError:
         pass
 
 
@@ -328,7 +327,7 @@ def aseqdump():
 
     class Aseqdump:
         process: Optional[subprocess.Popen]
-        output: List[Tuple[Address, str]]
+        output: list[tuple[Address, str]]
         port: Address
 
         def __init__(self, process: subprocess.Popen):

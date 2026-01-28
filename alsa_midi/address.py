@@ -1,6 +1,5 @@
-
 from collections import namedtuple
-from typing import TYPE_CHECKING, Any, Tuple, Union, overload
+from typing import TYPE_CHECKING, Any, Union, overload
 
 from ._ffi import alsa, ffi
 from .util import _check_alsa_error
@@ -10,7 +9,7 @@ if TYPE_CHECKING:
     from .port import Port, PortInfo
 
 
-AddressType = Union['Address', 'Port', 'PortInfo', Tuple[int, int]]
+AddressType = Union['Address', 'Port', 'PortInfo', tuple[int, int]]
 
 
 class Address(namedtuple("Address", "client_id port_id")):
@@ -79,7 +78,7 @@ class Address(namedtuple("Address", "client_id port_id")):
             return tuple.__new__(cls, tple)
 
     @staticmethod
-    def _parse(arg: str) -> Tuple[int, int]:
+    def _parse(arg: str) -> tuple[int, int]:
         addr_p = ffi.new("snd_seq_addr_t *")
         result = alsa.snd_seq_parse_address(ffi.NULL, addr_p, arg.encode())
         _check_alsa_error(result)
