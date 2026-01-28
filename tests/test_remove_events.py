@@ -1,4 +1,3 @@
-
 import pytest
 
 from alsa_midi import (READ_PORT, NoteOffEvent, NoteOnEvent, RemoveCondition, RemoveEvents,

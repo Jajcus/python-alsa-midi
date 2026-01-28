@@ -1,4 +1,3 @@
-
 import pytest
 
 from alsa_midi import RealTime

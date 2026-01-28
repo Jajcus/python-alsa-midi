@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import TYPE_CHECKING, NamedTuple, NewType, Optional, Union

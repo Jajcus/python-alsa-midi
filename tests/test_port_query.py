@@ -1,4 +1,3 @@
-
 import pytest
 
 from alsa_midi import READ_PORT, PortCaps, PortType, SequencerClient

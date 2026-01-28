@@ -1,4 +1,3 @@
-
 from ._ffi import alsa, ffi
 from .exceptions import ALSAError
 

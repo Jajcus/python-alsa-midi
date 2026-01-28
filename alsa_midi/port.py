@@ -1,7 +1,6 @@
-
 from dataclasses import InitVar, dataclass, field
 from enum import IntFlag
-from typing import TYPE_CHECKING, Any, Callable, List, NewType, Optional
+from typing import TYPE_CHECKING, Any, Callable, NewType, Optional
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -176,7 +175,7 @@ class Port:
             raise StateError("Already closed")
         return self.client.set_port_info(self, info)
 
-    def list_subscribers(self, type: 'SubscriptionQueryType' = None) -> List['SubscriptionQuery']:
+    def list_subscribers(self, type: 'SubscriptionQueryType' = None) -> list['SubscriptionQuery']:
         """Lists subscribers accessing a port.
 
         Wraps :alsa:`snd_seq_query_port_subscribers`.
@@ -286,7 +285,7 @@ class PortInfo:
         return info
 
 
-def get_port_info_sort_key(preferred_types: List[PortType] = []
+def get_port_info_sort_key(preferred_types: list[PortType] = []
                            ) -> Callable[[PortInfo], Any]:
     """Return a :class:`PortInfo` sorting key function for given type
     preference."""

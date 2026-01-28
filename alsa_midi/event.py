@@ -1,7 +1,7 @@
-
+from collections.abc import Iterable
 from enum import IntEnum, IntFlag
 from functools import total_ordering
-from typing import TYPE_CHECKING, Any, Iterable, NewType, Optional, Union
+from typing import TYPE_CHECKING, Any, NewType, Optional, Union
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
