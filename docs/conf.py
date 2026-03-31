@@ -14,7 +14,7 @@ version = ''
 release = ''
 
 
-needs_sphinx = '4.0'
+needs_sphinx = '7.0'
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -29,7 +29,7 @@ source_suffix = '.rst'
 
 master_doc = 'index'
 
-language = None
+language = 'en'
 
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
@@ -41,7 +41,7 @@ python_use_unqualified_type_names = True
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {'python': ('https://docs.python.org/3/', None)}
 
 doxylink = {
         'alsa': ('alsa.tag', 'https://www.alsa-project.org/alsa-doc/alsa-lib/'),
