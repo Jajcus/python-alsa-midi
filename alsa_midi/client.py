@@ -869,7 +869,7 @@ class SequencerClientBase:
                                                     remainder=remainder)
         if alsa_event.type == EventType.NONE:
             return alsa.snd_seq_event_output_pending(self.handle), remainder
-        result = alsa.snd_seq_event_output(self.handle, alsa_event)
+        result = alsa.snd_seq_event_output_direct(self.handle, alsa_event)
         return result, None
 
     def event_output_direct(self,
