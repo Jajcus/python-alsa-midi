@@ -15,19 +15,22 @@ def main():
                         help="Use real-time-stamp")
     parser.add_argument("--tick", "-t", action="store_false", dest="real",
                         help="Use tick-time-stamp")
-    parser.add_argument("sender", type=Address, metavar="CLIENT:PORT",
+    parser.add_argument("sender", metavar="CLIENT:PORT",
                         help="Source side of the connection")
-    parser.add_argument("dest", type=Address, metavar="CLIENT:PORT",
+    parser.add_argument("dest", metavar="CLIENT:PORT",
                         help="Sink side of the connection")
 
     args = parser.parse_args()
 
     client = SequencerClient("dump_events.py")
 
+    sender = client.get_address(args.sender)
+    dest   = client.get_address(args.dest)
+
     if args.disconnect:
-        client.unsubscribe_port(args.sender, args.dest)
+        client.unsubscribe_port(sender, dest)
     else:
-        client.subscribe_port(args.sender, args.dest,
+        client.subscribe_port(sender, dest,
                               exclusive=args.exclusive,
                               time_update=(args.real is not None),
                               time_real=args.real)
