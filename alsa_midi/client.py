@@ -419,6 +419,7 @@ class SequencerClientBase:
         assert (pfds[0].events & select.POLLIN) and (pfds[0].events & select.POLLOUT)
         self._fd = pfds[0].fd
 
+    @property
     def fd(self):
         "Returns the ALSA sequencer file descriptor number."
         return self._fd
@@ -1236,29 +1237,27 @@ class SequencerClientBase:
 
         return result
 
-
     @overload
-    def get_address(self, arg1: str) -> 'Address':
+    def resolve_address(self, arg1: str) -> 'Address':
         ...
 
     @overload
-    def get_address(self, arg1: str, arg2: str = '') -> 'Address':
+    def resolve_address(self, arg1: str, arg2: str = '') -> 'Address':
         ...
 
     @overload
-    def get_address(self, arg1: int, arg2: int = 0) -> 'Address':
+    def resolve_address(self, arg1: int, arg2: int = 0) -> 'Address':
         ...
 
     @overload
-    def get_address(self, arg1: tuple) -> 'Address':
+    def resolve_address(self, arg1: tuple) -> 'Address':
         ...
 
     @overload
-    def get_address(self, arg1: AddressType) -> 'Address':
+    def resolve_address(self, arg1: AddressType) -> 'Address':
         ...
 
-
-    def get_address(self,
+    def resolve_address(self,
                     arg1: Union[int, str, tuple, AddressType],
                     arg2: Union[int, str, None] = None) -> Address:
         """Parse client:port address string
@@ -1295,8 +1294,8 @@ class SequencerClientBase:
         """
 
         def type_error():
-            raise TypeError(   "(%s, %s) is not one or two ints and/or "
-                               "strings, or 2-tuple of same, or Address"
+            raise TypeError("(%s, %s) is not one or two ints and/or "
+                            "strings, or 2-tuple of same, or Address"
                             % (arg1, arg2))
 
         if arg2 is None:
@@ -1312,34 +1311,33 @@ class SequencerClientBase:
                 # split client and port
                 client_port = arg1.split(':')
                 if len(client_port) == 2:
-                    (client_name,port_name) = client_port
+                    (client_name, port_name) = client_port
                 else:
                     client_name = arg1
-                    port_name   = None
+                    port_name = None
             elif isinstance(arg1, int):
                 client_name = arg1
-                port_name   = None
+                port_name = None
             elif isinstance(arg1, tuple):
                 if arg2 is not None:
                     type_error()
                 if len(arg1) == 2:
-                    (client_name,port_name) = arg1
+                    (client_name, port_name) = arg1
                 else:
                     type_error()
             elif isinstance(arg1, Address):
                 if arg2 is not None:
                     type_error()
                 client_name = arg2.client_id  # int will be converted below
-                port_name   = arg2.port_id    #  "   "   "      "       "
+                port_name = arg2.port_id      # same
             else:
                 type_error()
         else:
             client_name = arg1
-            port_name   = arg2
+            port_name = arg2
 
-
-        if not (    isinstance(client_name, (int,str            ))
-                and isinstance(port_name,   (int,str,type(None)))):
+        if not (isinstance(client_name, (int, str))
+                and isinstance(port_name, (int, str, type(None)))):
             type_error()
 
         ports = self.list_ports(include_system=True)
@@ -1359,12 +1357,12 @@ class SequencerClientBase:
                 if port_info.client_name == client_name:
                     # exact match supercedes prefix matches
                     # but note can have multiple clients with same name
-                    client_id   = port_info.client_id
+                    client_id = port_info.client_id
                     best_client = port_info
                     break
                 elif port_info.client_name.startswith(client_name):
                     # last of multiples will overwrite
-                    client_id   = port_info.client_id
+                    client_id = port_info.client_id
                     best_client = port_info
         else:
             for port_info in ports:
@@ -1397,21 +1395,20 @@ class SequencerClientBase:
                     break
                 elif port_info.name == port_name:
                     # exact match supercedes prefix matches
-                    port_id   = port_info.port_id
+                    port_id = port_info.port_id
                     best_port = port_info
                     break
-                elif     isinstance(port_name, str) \
-                     and port_name in port_info.name:
+                elif isinstance(port_name, str) \
+                        and port_name in port_info.name:
                     # last of multiples will overwrite
-                    port_id   = port_info.port_id
+                    port_id = port_info.port_id
                     best_port = port_info
 
         if best_port is None:
-            raise FileNotFoundError(  "No ALSA client:port %d:%s"
-                                    % (client_id, port_name)     )
+            raise FileNotFoundError("No ALSA client:port %d:%s"
+                                    % (client_id, port_name))
         else:
             return Address(client_id, best_port.port_id)
-
 
     def _subunsub_port(self, func,
                        sender: AddressType, dest: AddressType, *,
