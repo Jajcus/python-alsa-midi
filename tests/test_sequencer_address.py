@@ -1,5 +1,6 @@
 import argparse
 import sys
+import time
 
 from collections import namedtuple
 
@@ -8,7 +9,7 @@ from alsa_midi import Address
 
 
 
-"""Tests SequencerClientBase.get_address()
+"""Tests SequencerClientBase.resolve_address()
 
 Tests many permutations of "numeric-or-named-client:numeric-or-named-port",
 "client:port", "client.port", "'client:port'", (client, port), ((client, port)),
@@ -25,9 +26,15 @@ Outputs test/pass/fail counts if either -v or -p
 """
 
 
+verbose = False
+
+clients_ports = {}  # have to store ports somewhere else go out of scope
+                    # and get deleted on return from create_ports()
+
 test_count = 0      # total number of permutations tested
 pass_count = 0      # successful tests
 fail_count = 0      # test which failed with expected error
+
 
 
 # clients/ports for tests
@@ -41,7 +48,7 @@ INPUT_CAPS  = alsa_midi.WRITE_PORT
 OUTPUT_CAPS = alsa_midi.READ_PORT
 IN_OUT_CAPS = INPUT_CAPS | OUTPUT_CAPS
 
-# all tests use this for client.get_address(...)
+# all tests use this for client.resolve_address(...)
 tester_ports = (
     port_spec("zero",   -1,     0,  False,  IN_OUT_CAPS),
 )
@@ -148,10 +155,10 @@ def address_parse(*args):
         else:
             return str(arg).replace(" ", '')
 
-    # test successful client.get_address()
+    # test successful client.resolve_address()
     if expected_error is None:
         try:
-            addr = tester.get_address(address_args)
+            addr = tester.resolve_address(address_args)
         except Exception as e:
             print_stats(sys.stderr)
             sys.stderr.write(  "%s raises unexpected %s\n"
@@ -159,11 +166,11 @@ def address_parse(*args):
             raise
     else:
         try:
-            addr = tester.get_address(address_args)
+            addr = tester.resolve_address(address_args)
         except expected_error:
             test_count += 1
             fail_count += 1
-            if opts.verbose:
+            if verbose:
                 sys.stdout.write(  "%s raises %s (as expected)\n"
                                  % (arg_name(address_args),
                                     expected_error.__name__))
@@ -195,7 +202,7 @@ def address_parse(*args):
                                    client_id,
                                    port_id  ) )
 
-    if opts.verbose:
+    if verbose:
         sys.stdout.write(   "%s -> %d:%d"
                          % (arg_name(address_args),
                             addr.client_id,
@@ -211,14 +218,14 @@ def address_parse(*args):
 # Tests permutations of "numeric-or-named-client:numeric-or-named-port",
 # "client:port", "client.port", "'client:port'", (client, port),
 # ((client, port)), etc.
-def test_variants(client,
-                  port,
-                  separator,
-                  quotes,
-                  client_id,
-                  port_id,
-                  expected_error,
-                  has_port_0=True):
+def do_variants(client,
+                port,
+                separator,
+                quotes,
+                client_id,
+                port_id,
+                expected_error,
+                has_port_0=True):
 
     # just client
     just_client_error = None if has_port_0 else FileNotFoundError
@@ -247,9 +254,9 @@ def test_variants(client,
 
 
 # test all ports of client
-def test_addresses(client_name, client_id, ports):
-    if opts.verbose:
-        sys.stdout.write(  "# --- test_addresses(%s, %s) ---\n"
+def do_addresses(client_name, client_id, ports):
+    if verbose:
+        sys.stdout.write(  "# --- do_addresses(%s, %s) ---\n"
                          % (client_name, client_id))
 
     # Not a rigorous test (ports could be explicit with first
@@ -270,14 +277,14 @@ def test_addresses(client_name, client_id, ports):
         no_ports = not(tests_bits << 3)
 
         for port in ports:
-            test_variants(client_name,
-                          port.name,
-                          separator,
-                          quotes,
-                          client_id,
-                          port.id,
-                          None,
-                          has_port_0)
+            do_variants(client_name,
+                        port.name,
+                        separator,
+                        quotes,
+                        client_id,
+                        port.id,
+                        None,
+                        has_port_0)
 
         # test that flagged ports can be accessed via substring
         for (port_ndx,port) in enumerate(ports):
@@ -285,14 +292,14 @@ def test_addresses(client_name, client_id, ports):
                 # test all 3 character substrings of port name
                 for char_ndx in range(0, len(port.name) - 3):
                     substring = port.name[char_ndx:char_ndx+3]
-                    test_variants(client_name,
-                                  substring,
-                                  separator,
-                                  quotes,
-                                  client_id,
-                                  port.id,
-                                  None,
-                                  has_port_0)
+                    do_variants(client_name,
+                                substring,
+                                separator,
+                                quotes,
+                                client_id,
+                                port.id,
+                                None,
+                                has_port_0)
 
 
 
@@ -300,8 +307,8 @@ def test_addresses(client_name, client_id, ports):
 #
 # Note first client created by create_ports() (gets assigned i.d. 128)
 # must have port id 0 (explicit or default assigned)
-def test_simple():
-    if opts.verbose: sys.stdout.write("# --- test_simple() ---\n")
+def do_simple():
+    if verbose: sys.stdout.write("# --- do_simple() ---\n")
 
     address_parse(         128,             128, 0, None)
     address_parse(        '128',            128, 0, None)
@@ -315,9 +322,9 @@ def test_simple():
 
 
 
-# Test of client.get_address() overloads
-def test_overloads(client_name, client_id, port_name, port_id):
-    if opts.verbose: sys.stdout.write("# --- test_overloads() ---\n")
+# Test of client.resolve_address() overloads
+def do_overloads(client_name, client_id, port_name, port_id):
+    if verbose: sys.stdout.write("# --- do_overloads() ---\n")
 
     overloads = []
 
@@ -338,14 +345,14 @@ def test_overloads(client_name, client_id, port_name, port_id):
     test('%s:%d' % (client_name, port_id  )) # str:iin
     test('%s:%s' % (client_name, port_name)) # str:str
 
-    overloads.append(tester.get_address(overloads[0]))  # address
+    overloads.append(tester.resolve_address(overloads[0]))  # address
 
     assert(all(addr == overloads[0] for addr in overloads))
 
 
 
-def test_bad_arguments():
-    if opts.verbose: sys.stdout.write("# --- test_bad_arguments() ---\n")
+def do_bad_arguments():
+    if verbose: sys.stdout.write("# --- do_bad_arguments() ---\n")
 
     address_parse(3.14,                     0, 0, TypeError)
     address_parse([],                       0, 0, TypeError)
@@ -388,22 +395,22 @@ def test_bad_arguments():
 
 
 
-def test_bad_clients_ports():
-    if opts.verbose: sys.stdout.write("# --- test_bad_clients_ports() ---\n")
+def do_bad_clients_ports():
+    if verbose: sys.stdout.write("# --- do_bad_clients_ports() ---\n")
     for client in (-1, 256, 'bad_client'):
         for port in (0, -1, 256, 'bad_port'):
-            test_variants(client,
-                          port,
-                          ':',
-                          '',
-                          client,
-                          port,
-                          FileNotFoundError,
-                          has_port_0=False)
+            do_variants(client,
+                        port,
+                        ':',
+                        '',
+                        client,
+                        port,
+                        FileNotFoundError,
+                        has_port_0=False)
 
 
 
-def test_good_client_bad_ports(client_name, client_id):
+def do_good_client_bad_ports(client_name, client_id):
     for port in (-1, 256, 'bad_port'):
         for separator in (':', '.'):
             for quotes in ('', "'", '"'):
@@ -425,19 +432,45 @@ def test_good_client_bad_ports(client_name, client_id):
 
 
 
-if __name__ == '__main__':
+def test_sequencer_address():
+    global tester
+
     tester     = alsa_midi.SequencerClient("tester"    )   # all tests use this
     sequential = alsa_midi.SequencerClient("sequential")
     prefix     = alsa_midi.SequencerClient("seq"       )
     explicit   = alsa_midi.SequencerClient("explicit"  )
 
     # First one gets assigned client id 128, must have port
-    # with id 0 for test_simple()
+    # with id 0 for do_simple()
     test_id = tester    .get_client_info().client_id
     seqn_id = sequential.get_client_info().client_id
     prfx_id = prefix    .get_client_info().client_id
     expl_id = explicit  .get_client_info().client_id
 
+    create_ports(tester    , tester_ports    )
+    create_ports(sequential, sequential_ports)
+    create_ports(prefix    , prefix_ports    )
+    create_ports(explicit  , explicit_ports  )
+
+    # sometimes delay before clients/ports actually exist
+    # particularly if run in tox/pytest environment
+    time.sleep(2)
+
+    do_simple()
+    do_bad_arguments()
+    do_overloads('explicit', expl_id, 'eleven', 11)  # only need to do one
+    do_bad_clients_ports()
+    do_good_client_bad_ports('explicit', expl_id)    # only need to do one
+
+    do_addresses("tester",     test_id, tester_ports)
+    do_addresses("sequential", seqn_id, sequential_ports)
+    do_addresses("seq",        prfx_id, prefix_ports) # client,port substrings
+    do_addresses("explicit",   expl_id, explicit_ports)
+    do_addresses("expl",       expl_id, explicit_ports) # substrings
+
+
+
+if __name__ == '__main__':
     # commandline options
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose',
@@ -448,24 +481,9 @@ if __name__ == '__main__':
                         help="Pause after tests")
     opts = parser.parse_args()
 
-    clients_ports = {}  # have to store ports somewhere else go out of scope
-                        # and get deleted on return from create_ports()
-    create_ports(tester    , tester_ports    )
-    create_ports(sequential, sequential_ports)
-    create_ports(prefix    , prefix_ports    )
-    create_ports(explicit  , explicit_ports  )
+    verbose = opts.verbose
 
-    test_simple()
-    test_bad_arguments()
-    test_overloads('explicit', expl_id, 'eleven', 11)    # only need to do one
-    test_bad_clients_ports()
-    test_good_client_bad_ports('explicit', expl_id)  # only need to do one
-
-    test_addresses("tester",     test_id, tester_ports)
-    test_addresses("sequential", seqn_id, sequential_ports)
-    test_addresses("seq",        prfx_id, prefix_ports) # client,port substrings
-    test_addresses("explicit",   expl_id, explicit_ports)
-    test_addresses("expl",       expl_id, explicit_ports) # substrings
+    test_sequencer_address()
 
     if opts.verbose or opts.pause:
         print_stats()
@@ -477,9 +495,5 @@ if __name__ == '__main__':
             while True: pass
         except KeyboardInterrupt:
             sys.stdout.write("exiting\n")
-
-    explicit.close()
-    sequential.close()
-    tester.close()
 
     sys.exit(0)

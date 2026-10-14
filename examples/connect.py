@@ -2,7 +2,7 @@
 
 from argparse import ArgumentParser
 
-from alsa_midi import Address, SequencerClient
+from alsa_midi import SequencerClient
 
 
 def main():
@@ -24,8 +24,8 @@ def main():
 
     client = SequencerClient("dump_events.py")
 
-    sender = client.get_address(args.sender)
-    dest   = client.get_address(args.dest)
+    sender = client.resolve_address(args.sender)
+    dest = client.resolve_address(args.dest)
 
     if args.disconnect:
         client.unsubscribe_port(sender, dest)
