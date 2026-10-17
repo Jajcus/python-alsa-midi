@@ -131,7 +131,7 @@ def test_list_ports(alsa_seq_state):
     # test defaults
     alsa_seq_state.load()
     alsa_client_names = [client.name for client in alsa_seq_state.clients.values()]
-    ports = client.list_ports()
+    ports = client.list_ports(include_system=True, include_kernel=True)
 
     for port in ports:
         assert isinstance(port, PortInfo)
@@ -237,7 +237,7 @@ def test_list_ports(alsa_seq_state):
     assert s_inout_port_a not in port_addrs
 
     # test include_system=True
-    ports = client.list_ports(include_system=True, type=PortType.ANY)
+    ports = client.list_ports(include_system=True, include_kernel=True, type=PortType.ANY)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     client_names = {p.client_name for p in ports}
     if "Midi Through" in alsa_client_names:
@@ -253,7 +253,7 @@ def test_list_ports(alsa_seq_state):
     assert inout_port_ne_a in port_addrs
 
     # test include_system=False
-    ports = client.list_ports(include_system=False, type=PortType.ANY)
+    ports = client.list_ports(include_system=False, include_kernel=True,  type=PortType.ANY)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     client_names = {p.client_name for p in ports}
     if "Midi Through" in alsa_client_names:
@@ -269,7 +269,7 @@ def test_list_ports(alsa_seq_state):
     assert inout_port_ne_a in port_addrs
 
     # test include_midi_through=True
-    ports = client.list_ports(include_midi_through=True)
+    ports = client.list_ports(include_midi_through=True, include_kernel=True)
     port_addrs = {(p.client_id, p.port_id) for p in ports}
     client_names = {p.client_name for p in ports}
     if "Midi Through" in alsa_client_names:
@@ -378,7 +378,7 @@ def test_list_ports_sorting(alsa_seq_state):
     # test defaults
     alsa_seq_state.load()
     alsa_client_names = [client.name for client in alsa_seq_state.clients.values()]
-    ports = client.list_ports(type=PortType.ANY)
+    ports = client.list_ports(type=PortType.ANY, include_kernel=True)
 
     for port in ports:
         assert isinstance(port, PortInfo)
@@ -444,7 +444,7 @@ def test_list_ports_sorting(alsa_seq_state):
 
     # default sorting
     ports = client.list_ports(only_connectable=False, include_system=True,
-                              type=PortType.ANY)
+                              type=PortType.ANY, include_kernel=True)
     pa = [(p.client_id, p.port_id) for p in ports]
 
     assert pa.index(specific_inout_a) > pa.index(midi_generic_input_a)
@@ -459,7 +459,8 @@ def test_list_ports_sorting(alsa_seq_state):
         assert ports[-1].client_name == "Midi Through"
 
     # default input port sorting
-    ports = client.list_ports(only_connectable=False, include_system=True, input=True,
+    ports = client.list_ports(only_connectable=False, include_system=True,
+                              include_kernel=True, input=True,
                               type=PortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 
@@ -472,7 +473,8 @@ def test_list_ports_sorting(alsa_seq_state):
         assert ports[-1].client_name == "Midi Through"
 
     # default output port sorting
-    ports = client.list_ports(only_connectable=False, include_system=True, output=True,
+    ports = client.list_ports(only_connectable=False, include_system=True,
+                              include_kernel=True, output=True,
                               type=PortType.ANY)
     pa = [(p.client_id, p.port_id) for p in ports]
 

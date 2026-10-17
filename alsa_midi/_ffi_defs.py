@@ -563,6 +563,11 @@ typedef struct _snd_seq_port_info snd_seq_port_info_t;
 #define SND_SEQ_PORT_SYSTEM_TIMER   0
 #define SND_SEQ_PORT_SYSTEM_ANNOUNCE    1
 
+#define SND_SEQ_PORT_DIR_UNKNOWN        0
+#define SND_SEQ_PORT_DIR_INPUT          1
+#define SND_SEQ_PORT_DIR_OUTPUT         2
+#define SND_SEQ_PORT_DIR_BIDIRECTION    3
+
 #define SND_SEQ_PORT_CAP_READ       1
 #define SND_SEQ_PORT_CAP_WRITE      2
 
@@ -600,6 +605,7 @@ int snd_seq_port_info_get_client(const snd_seq_port_info_t *info);
 int snd_seq_port_info_get_port(const snd_seq_port_info_t *info);
 const snd_seq_addr_t *snd_seq_port_info_get_addr(const snd_seq_port_info_t *info);
 const char *snd_seq_port_info_get_name(const snd_seq_port_info_t *info);
+unsigned int snd_seq_port_info_get_direction(const snd_seq_port_info_t *info);
 unsigned int snd_seq_port_info_get_capability(const snd_seq_port_info_t *info);
 unsigned int snd_seq_port_info_get_type(const snd_seq_port_info_t *info);
 int snd_seq_port_info_get_midi_channels(const snd_seq_port_info_t *info);
@@ -616,6 +622,7 @@ void snd_seq_port_info_set_client(snd_seq_port_info_t *info, int client);
 void snd_seq_port_info_set_port(snd_seq_port_info_t *info, int port);
 void snd_seq_port_info_set_addr(snd_seq_port_info_t *info, const snd_seq_addr_t *addr);
 void snd_seq_port_info_set_name(snd_seq_port_info_t *info, const char *name);
+void snd_seq_port_info_set_direction(snd_seq_port_info_t *info, int direction);
 void snd_seq_port_info_set_capability(snd_seq_port_info_t *info, unsigned int capability);
 void snd_seq_port_info_set_type(snd_seq_port_info_t *info, unsigned int type);
 void snd_seq_port_info_set_midi_channels(snd_seq_port_info_t *info, int channels);
