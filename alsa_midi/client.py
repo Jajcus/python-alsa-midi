@@ -1258,8 +1258,8 @@ class SequencerClientBase:
         ...
 
     def resolve_address(self,
-                    arg1: Union[int, str, tuple, AddressType],
-                    arg2: Union[int, str, None] = None) -> Address:
+                        arg1: Union[int, str, tuple, AddressType],
+                        arg2: Union[int, str, None] = None) -> Address:
         """Parse client:port address string
 
         Similar to Address() but parses client and port by names
