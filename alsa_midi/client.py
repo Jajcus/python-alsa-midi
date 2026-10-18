@@ -404,6 +404,7 @@ class SequencerClientBase:
         self._handle_p = None  # type: ignore
         self.handle = None  # type: ignore
         self._event_parser = None
+        self._fd = -1
 
     def _get_fds(self):
         """Get the file descriptor number for the client connection into :data:`self._fd`."""
@@ -429,6 +430,21 @@ class SequencerClientBase:
             alsa.snd_midi_event_no_status(parser, 1)
             self._event_parser = parser
         return parser
+
+    def fileno(self):
+        """Return file descriptor assigned to this connection.
+
+        This file descriptor can be used with select, poll, or other event
+        loop mechanisms for monitoring ALSA sequencer events.
+
+        Wraps :alsa:`snd_seq_poll_descriptors`.
+
+        :return: file descriptor number
+        :raises OSError: if the connection is closed or file descriptor is not available
+        """
+        if self._fd >= 0:
+            return self._fd
+        raise OSError("File descriptor not available")
 
     def get_sequencer_name(self) -> str:
         """Get sequencer name.
