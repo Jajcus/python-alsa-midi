@@ -1,11 +1,13 @@
+# flake8: noqa
+
 import argparse
 import sys
 import time
 
-from collections import namedtuple
+from collections import namedtuple  # isort: skip
 
-import alsa_midi
-from alsa_midi import Address
+import alsa_midi                    # isort: skip
+from alsa_midi import Address       # isort: skip
 
 
 
