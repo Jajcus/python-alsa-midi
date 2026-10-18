@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
 from enum import IntEnum, IntFlag
 from functools import total_ordering
-from typing import TYPE_CHECKING, Any, NewType, Optional, Union
+from typing import TYPE_CHECKING, Any, NewType
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -30,7 +32,7 @@ class RealTime:
     seconds: int
     nanoseconds: int
 
-    def __init__(self, seconds: Union[float, int, str, 'RealTime'] = 0, nanoseconds: int = 0):
+    def __init__(self, seconds: float | int | str | 'RealTime' = 0, nanoseconds: int = 0):
         if isinstance(seconds, RealTime):
             self.seconds = seconds.seconds
             self.nanoseconds = seconds.nanoseconds + nanoseconds
@@ -229,28 +231,28 @@ class Event:
     _specialized = {}
     type = None
 
-    flags: Optional[EventFlags]
+    flags: EventFlags | None
     tag: int
-    queue_id: Optional[int]
-    time: Optional[RealTime]
-    tick: Optional[int]
-    source: Optional[Address]
-    dest: Optional[Address]
-    relative: Optional[bool]
-    raw_data: Optional[bytes]
+    queue_id: int | None
+    time: RealTime | None
+    tick: int | None
+    source: Address | None
+    dest: Address | None
+    relative: bool | None
+    raw_data: bytes | None
 
     def __init__(self,
-                 type: Optional[EventType] = None,
+                 type: EventType | None = None,
                  *,
-                 flags: Optional[Union[EventFlags, int]] = 0,
+                 flags: EventFlags | int = 0,
                  tag: int = 0,
-                 queue_id: Optional[int] = None,
-                 time: Optional[Union[RealTime, float, int]] = None,
-                 tick: Optional[int] = None,
-                 source: Optional[AddressType] = None,
-                 dest: Optional[AddressType] = None,
-                 relative: Optional[bool] = None,
-                 raw_data: bytes = None,
+                 queue_id: int | None = None,
+                 time: RealTime | float | int | None = None,
+                 tick: int | None = None,
+                 source: AddressType | None = None,
+                 dest: AddressType | None = None,
+                 relative: bool | None = None,
+                 raw_data: bytes | None = None,
                  ):
 
         if type is None and self.__class__.type is not None:
@@ -323,8 +325,8 @@ class Event:
                    **kwargs)
 
     def _to_alsa(self, a_event: _snd_seq_event_t, *,
-                 queue: Union['Queue', int] = None,
-                 port: Union['Port', int] = None,
+                 queue: 'Queue' | int = None,
+                 port: 'Port' | int = None,
                  dest: AddressType = None
                  ) -> _snd_seq_event_t:
         if self.type is not None:
@@ -404,7 +406,7 @@ class MidiBytesEvent(Event):
     midi_bytes: bytes
 
     def __init__(self,
-                 midi_bytes: Union[bytes, Iterable[int]],
+                 midi_bytes: bytes | Iterable[int],
                  **kwargs):
         super().__init__(**kwargs)
         self.midi_bytes = bytes(midi_bytes)
@@ -603,10 +605,10 @@ class QueueControlEventBase(Event):
 
     :ivar control_queue: affected queue id
     """
-    control_queue: Optional[int]
+    control_queue: int | None
 
     def __init__(self,
-                 control_queue: Optional[Union[int, 'Queue']] = None,
+                 control_queue: int | 'Queue' | None = None,
                  **kwargs):
         assert self.type is not None
         super().__init__(self.type, **kwargs)
@@ -945,7 +947,7 @@ class SetQueuePositionTimeEvent(QueueControlEventBase):
     position: RealTime
 
     def __init__(self,
-                 position: Union[RealTime, int, float],
+                 position: RealTime | int | float,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.position = RealTime(position)

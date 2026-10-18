@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import InitVar, dataclass, field
 from enum import IntFlag
-from typing import TYPE_CHECKING, Any, Callable, NewType, Optional
+from typing import TYPE_CHECKING, Any, Callable, NewType
 
 from ._ffi import alsa, ffi
 from .address import Address, AddressType
@@ -73,7 +75,7 @@ class Port:
     :ivar port_id: port identifier
     """
 
-    client: Optional['SequencerClientBase']
+    client: 'SequencerClientBase' | None
     client_id: int
     port_id: int
 
@@ -217,7 +219,7 @@ class PortInfo:
     """
 
     client_id: int = 0
-    port_id: Optional[int] = None
+    port_id: int | None = None
     name: str = ""
     capability: PortCaps = PortCaps._NONE
     type: PortType = PortType.ANY
@@ -226,12 +228,12 @@ class PortInfo:
     synth_voices: int = 0
     read_use: int = 0
     write_use: int = 0
-    port_specified: InitVar[Optional[bool]] = None
+    port_specified: InitVar[bool | None] = None
     timestamping: bool = False
     timestamp_real: bool = False
     timestamp_queue_id: int = 0
 
-    client_name: Optional[str] = field(init=False, default=None)
+    client_name: str | None = field(init=False, default=None)
 
     def __post_init__(self, port_specified=None):
         if port_specified is not None and not port_specified:
