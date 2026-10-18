@@ -4,7 +4,6 @@ import re
 import subprocess
 import sys
 from statistics import mean
-from typing import Optional
 
 import pytest
 import pytest_asyncio
@@ -42,7 +41,7 @@ class AlsaClientState:
     client_id: int
     name: str
     type: str
-    version: Optional[str]
+    version: str | None
     ports: dict[int, AlsaPortState]
     queues: dict[int, 'AlsaQueueState']
 
@@ -326,7 +325,7 @@ def aseqdump():
     from alsa_midi import Address
 
     class Aseqdump:
-        process: Optional[subprocess.Popen]
+        process: subprocess.Popen | None
         output: list[tuple[Address, str]]
         port: Address
 
