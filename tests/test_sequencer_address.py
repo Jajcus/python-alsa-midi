@@ -1,16 +1,3 @@
-# flake8: noqa
-
-import argparse
-import sys
-import time
-
-from collections import namedtuple  # isort: skip
-
-import alsa_midi                    # isort: skip
-from alsa_midi import Address       # isort: skip
-
-
-
 """Tests SequencerClientBase.resolve_address()
 
 Tests many permutations of "numeric-or-named-client:numeric-or-named-port",
@@ -28,15 +15,27 @@ Outputs test/pass/fail counts if either -v or -p
 """
 
 
+import argparse
+import sys
+import time
+
+from collections import namedtuple  # isort: skip
+import pytest                       # isort: skip
+
+import alsa_midi                    # isort: skip
+from alsa_midi import Address       # isort: skip
+
+
 verbose = False
 
-clients_ports = {}  # have to store ports somewhere else go out of scope
-                    # and get deleted on return from create_ports()
+# Have to store ports somewhere else go out of scope
+# and get deleted on return from create_ports()
+clients_ports = {}
+
 
 test_count = 0      # total number of permutations tested
 pass_count = 0      # successful tests
 fail_count = 0      # test which failed with expected error
-
 
 
 # clients/ports for tests
@@ -46,7 +45,7 @@ fail_count = 0      # test which failed with expected error
 port_spec = namedtuple('port_spec', "name req_id id substr caps")
 
 # mixture of capabilities (not used, but to make sure don't affect results)
-INPUT_CAPS  = alsa_midi.WRITE_PORT
+INPUT_CAPS = alsa_midi.WRITE_PORT
 OUTPUT_CAPS = alsa_midi.READ_PORT
 IN_OUT_CAPS = INPUT_CAPS | OUTPUT_CAPS
 
@@ -58,52 +57,50 @@ tester_ports = (
 # default sequentially-numbered ports
 # tests port can be accessed by substring of name
 sequential_ports = (
-    port_spec("zero",   -1,     0,  False,  INPUT_CAPS  ),
-    port_spec("One",    -1,     1,  False,  OUTPUT_CAPS ),
-    port_spec("two"  ,  -1,     2,  False,  IN_OUT_CAPS ),
-    port_spec("three",  -1,     3,  True,   OUTPUT_CAPS ),   # test by substring
-    port_spec("FOUR" ,  -1,     4,  False,  INPUT_CAPS  ),
-    port_spec("five" ,  -1,     5,  False,  IN_OUT_CAPS ),
+    port_spec("zero",   -1,     0,  False,  INPUT_CAPS),
+    port_spec("One",    -1,     1,  False,  OUTPUT_CAPS),
+    port_spec("two",  -1,     2,  False,  IN_OUT_CAPS),
+    port_spec("three",  -1,     3,  True,   OUTPUT_CAPS),   # test by substring
+    port_spec("FOUR",  -1,     4,  False,  INPUT_CAPS),
+    port_spec("five",  -1,     5,  False,  IN_OUT_CAPS),
 )
 
 # find above ports by substrings of names
 prefix_ports = (
-    port_spec("er",     -1,     0,  False,  IN_OUT_CAPS ),
-    port_spec("On",     -1,     1,  False,  INPUT_CAPS  ),
-    port_spec("wo",     -1,     2,  False,  OUTPUT_CAPS ),
+    port_spec("er",     -1,     0,  False,  IN_OUT_CAPS),
+    port_spec("On",     -1,     1,  False,  INPUT_CAPS),
+    port_spec("wo",     -1,     2,  False,  OUTPUT_CAPS),
 )
 
 # explicit non-default, non-sequential port numbers
 # tests exact match of port name overrides substring match
 explicit_ports = (
-    port_spec("THREE",   3,     3,  False,  OUTPUT_CAPS ),
-    port_spec("six",     6,     6,  False,  INPUT_CAPS  ),
-    port_spec("Eight",   8,     8,  False,  IN_OUT_CAPS ),
-    port_spec("ele",    12,    12,  False,  INPUT_CAPS  ),   # exact match
-    port_spec("lev",    13,    13,  False,  INPUT_CAPS  ),   #   "    "
-    port_spec("eleven", 11,    11,  False,  INPUT_CAPS  ),
-    port_spec("eve",    14,    14,  False,  INPUT_CAPS  ),   # exact match
-    port_spec("ven"  ,  15,    15,  False,  INPUT_CAPS  ),   #   "    "
-    port_spec("twenTY", 20,    20,  False,  OUTPUT_CAPS ),
+    port_spec("THREE",   3,     3,  False,  OUTPUT_CAPS),
+    port_spec("six",     6,     6,  False,  INPUT_CAPS),
+    port_spec("Eight",   8,     8,  False,  IN_OUT_CAPS),
+    port_spec("ele",    12,    12,  False,  INPUT_CAPS),   # exact match
+    port_spec("lev",    13,    13,  False,  INPUT_CAPS),  # "    "
+    port_spec("eleven", 11,    11,  False,  INPUT_CAPS),
+    port_spec("eve",    14,    14,  False,  INPUT_CAPS),   # exact match
+    port_spec("ven",  15,    15,  False,  INPUT_CAPS),  # "    "
+    port_spec("twenTY", 20,    20,  False,  OUTPUT_CAPS),
 )
-
 
 
 # at program exit if -v/--verbose, -p/--pause, or uncaught exception
 def print_stats(stream=sys.stdout):
-    global test_count, pass_count, fail_count
-    stream.write(  "%d tests\n"
-                   "%d passed\n"
-                   "%d failed with expected errors  \n"
+    global test_count, pass_count, fail_count   # noqa: F824
+    stream.write("%d tests\n"
+                 "%d passed\n"
+                 "%d failed with expected errors  \n"
                  % (test_count,
                     pass_count,
                     fail_count))
 
 
-
 # create clients/ports ports from above tuples of port_specs
 def create_ports(client, port_descs):
-    global clients_ports
+    global clients_ports    # noqa: F824
 
     client_name = client.get_client_info().name
 
@@ -118,7 +115,6 @@ def create_ports(client, port_descs):
         clients_ports.setdefault(client_name, []).append(port)
 
 
-
 # Parse address of various forms ('client:port', (client, port),
 # ((client, port),), etc. checking for success or expected error
 # exception.
@@ -127,17 +123,17 @@ def address_parse(*args):
     # and expected-error-or-None
 
     assert len(args) > 3, \
-           "internal test program bug: address_parse(%s) <= 3\n" % (args,)
+        "internal test program bug: address_parse(%s) <= 3\n" % (args,)
 
-    expected_error = args[ -1]
-    port_id        = args[ -2]
-    client_id      = args[ -3]
-    address_args   = args[:-3]
+    expected_error = args[-1]
+    port_id = args[-2]
+    client_id = args[-3]
+    address_args = args[:-3]
 
     global test_count, pass_count, fail_count
 
     # input of ((a,b),c,d,e) -> ((a,b),) not (a,b)
-    if len(address_args) == 1: # and isinstance(address_args[0], tuple):
+    if len(address_args) == 1:
         address_args = address_args[0]
         is_tuple = False    # for arg_name()
     else:
@@ -148,7 +144,7 @@ def address_parse(*args):
         if hasattr(arg, 'client_id'):
             return 'Address(%s)' % str(arg)
         elif is_tuple:
-            return str(arg)[1:-1].replace(" ",'')    # strip('()') strips all
+            return str(arg)[1:-1].replace(" ", '')    # strip('()') strips all
         elif isinstance(arg, str):
             if arg.startswith("'"):
                 return '"%s"' % arg
@@ -163,7 +159,7 @@ def address_parse(*args):
             addr = tester.resolve_address(address_args)
         except Exception as e:
             print_stats(sys.stderr)
-            sys.stderr.write(  "%s raises unexpected %s\n"
+            sys.stderr.write("%s raises unexpected %s\n"
                              % (arg_name(address_args), type(e).__name__))
             raise
     else:
@@ -173,21 +169,21 @@ def address_parse(*args):
             test_count += 1
             fail_count += 1
             if verbose:
-                sys.stdout.write(  "%s raises %s (as expected)\n"
+                sys.stdout.write("%s raises %s (as expected)\n"
                                  % (arg_name(address_args),
                                     expected_error.__name__))
-            return;
+            return
         except Exception as e:
             print_stats(sys.stderr)
-            sys.stderr.write(  "%s raises %s (not expected %s)\n"
+            sys.stderr.write("%s raises %s (not expected %s)\n"
                              % (arg_name(address_args),
                                 type(e).__name__,
                                 expected_error.__name__))
             raise
         else:
             print_stats(sys.stderr)
-            sys.stdout.write(   "%s -> %d:%d without raising "
-                                "expected error %s\n"
+            sys.stdout.write("%s -> %d:%d without raising "
+                             "expected error %s\n"
                              % (arg_name(address_args),
                                 addr.client_id,
                                 addr.port_id,
@@ -198,19 +194,20 @@ def address_parse(*args):
     pass_count += 1
 
     if addr.client_id != client_id or addr.port_id != port_id:
-        raise FileNotFoundError(  "%s -> %s, not expected (%d,%d)"
+        raise FileNotFoundError("%s -> %s, not expected (%d,%d)"
                                 % (arg_name(address_args),
                                    addr,
                                    client_id,
-                                   port_id  ) )
+                                   port_id))
 
     if verbose:
-        sys.stdout.write(   "%s -> %d:%d"
+        sys.stdout.write("%s -> %d:%d"
                          % (arg_name(address_args),
                             addr.client_id,
                             addr.port_id))
         if expected_error is not None:
-            sys.stdout.write(" with expected exception: %s\n" % expect_except)
+            sys.stdout.write(" with expected exception: %s\n"
+                             % expected_error)
         else:
             sys.stdout.write('\n')
 
@@ -237,28 +234,27 @@ def do_variants(client,
 
     # client and port
     spec = "%s%s%s%s%s" % (quotes, client, separator, port, quotes)
-    address_parse( spec,                client_id, port_id, expected_error)
-    address_parse( client,    port,     client_id, port_id, expected_error)
+    address_parse(spec,                client_id, port_id, expected_error)
+    address_parse(client,    port,     client_id, port_id, expected_error)
     address_parse((client,    port),    client_id, port_id, expected_error)
-    address_parse( client_id, port,     client_id, port_id, expected_error)
+    address_parse(client_id, port,     client_id, port_id, expected_error)
     address_parse((client_id, port),    client_id, port_id, expected_error)
-    address_parse( client,    port_id,  client_id, port_id, expected_error)
+    address_parse(client,    port_id,  client_id, port_id, expected_error)
     address_parse((client,    port_id), client_id, port_id, expected_error)
-    address_parse( client_id, port_id,  client_id, port_id, expected_error)
+    address_parse(client_id, port_id,  client_id, port_id, expected_error)
     address_parse((client_id, port_id), client_id, port_id, expected_error)
 
-    if isinstance(client_id, int) and isinstance(port, int) :
+    if isinstance(client_id, int) and isinstance(port, int):
         address_parse(Address(client_id, port_id),
                       client_id,
                       port_id,
                       expected_error)
 
 
-
 # test all ports of client
 def do_addresses(client_name, client_id, ports):
     if verbose:
-        sys.stdout.write(  "# --- do_addresses(%s, %s) ---\n"
+        sys.stdout.write("# --- do_addresses(%s, %s) ---\n"
                          % (client_name, client_id))
 
     # Not a rigorous test (ports could be explicit with first
@@ -269,14 +265,15 @@ def do_addresses(client_name, client_id, ports):
     has_port_0 = (ports[0].id == 0)
 
     # permutations of address specifications
-    for tests_bits in range(1<<4):
-        if (tests_bits & 1): separator = ':'
-        else:                separator = '.'
+    for tests_bits in range(1 << 4):
+        if (tests_bits & 1):
+            separator = ':'
+        else:
+            separator = '.'
 
         quotes = ("", "'", '"', None)[(tests_bits >> 1) & 0x3]
-        if quotes is None: continue
-
-        no_ports = not(tests_bits << 3)
+        if quotes is None:
+            continue
 
         for port in ports:
             do_variants(client_name,
@@ -289,7 +286,7 @@ def do_addresses(client_name, client_id, ports):
                         has_port_0)
 
         # test that flagged ports can be accessed via substring
-        for (port_ndx,port) in enumerate(ports):
+        for (port_ndx, port) in enumerate(ports):
             if port.substr:
                 # test all 3 character substrings of port name
                 for char_ndx in range(0, len(port.name) - 3):
@@ -304,57 +301,57 @@ def do_addresses(client_name, client_id, ports):
                                 has_port_0)
 
 
-
 # Test numeric client and port
 #
 # Note first client created by create_ports() (gets assigned i.d. 128)
 # must have port id 0 (explicit or default assigned)
 def do_simple():
-    if verbose: sys.stdout.write("# --- do_simple() ---\n")
+    if verbose:
+        sys.stdout.write("# --- do_simple() ---\n")
 
-    address_parse(         128,             128, 0, None)
-    address_parse(        '128',            128, 0, None)
-    address_parse(         128, 0,          128, 0, None)
-    address_parse(        '128:0',          128, 0, None)
-    address_parse(        (128, 0),         128, 0, None)
-    address_parse( Address(128, 0),         128, 0, None)
+    address_parse(128,             128, 0, None)
+    address_parse('128',            128, 0, None)
+    address_parse(128, 0,          128, 0, None)
+    address_parse('128:0',          128, 0, None)
+    address_parse((128, 0),         128, 0, None)
+    address_parse(Address(128, 0),         128, 0, None)
     address_parse((Address(128, 0),),       128, 0, TypeError)
-    address_parse( 128, Address(128, 0),    0,   0, TypeError)
+    address_parse(128, Address(128, 0),    0,   0, TypeError)
     address_parse((128, Address(128, 0)),   0,   0, TypeError)
-
 
 
 # Test of client.resolve_address() overloads
 def do_overloads(client_name, client_id, port_name, port_id):
-    if verbose: sys.stdout.write("# --- do_overloads() ---\n")
+    if verbose:
+        sys.stdout.write("# --- do_overloads() ---\n")
 
     overloads = []
 
     def test(*args):
         overloads.append(address_parse(*(args + (client_id, port_id, None))))
 
-    test( client_id  , port_id  )    # 2 ints
-    test((client_id  , port_id  ))   # tuple, same
-    test( client_id  , port_name)    # int, str
-    test((client_id  , port_name))   # tuple, same
-    test( client_name, port_id  )    # str, int
-    test((client_name, port_id  ))   # tuple, same
-    test( client_name, port_name)    # 2 str
+    test(client_id, port_id)    # 2 ints
+    test((client_id, port_id))   # tuple, same
+    test(client_id, port_name)    # int, str
+    test((client_id, port_name))   # tuple, same
+    test(client_name, port_id)    # str, int
+    test((client_name, port_id))   # tuple, same
+    test(client_name, port_name)    # 2 str
     test((client_name, port_name))   # tuple, same
 
-    test('%d:%d' % (client_id  , port_id  )) # int:int
-    test('%d:%s' % (client_id  , port_name)) # int:str
-    test('%s:%d' % (client_name, port_id  )) # str:iin
-    test('%s:%s' % (client_name, port_name)) # str:str
+    test('%d:%d' % (client_id, port_id))  # int:int
+    test('%d:%s' % (client_id, port_name))  # int:str
+    test('%s:%d' % (client_name, port_id))  # str:iin
+    test('%s:%s' % (client_name, port_name))  # str:str
 
     overloads.append(tester.resolve_address(overloads[0]))  # address
 
-    assert(all(addr == overloads[0] for addr in overloads))
-
+    assert (all(addr == overloads[0] for addr in overloads))
 
 
 def do_bad_arguments():
-    if verbose: sys.stdout.write("# --- do_bad_arguments() ---\n")
+    if verbose:
+        sys.stdout.write("# --- do_bad_arguments() ---\n")
 
     address_parse(3.14,                     0, 0, TypeError)
     address_parse([],                       0, 0, TypeError)
@@ -363,42 +360,42 @@ def do_bad_arguments():
     address_parse((128,),                   0, 0, TypeError)
     address_parse(('explicit',),            0, 0, TypeError)
     address_parse((3.14,),                  0, 0, TypeError)
-    address_parse((Address(128,0),),        0, 0, TypeError)
+    address_parse((Address(128, 0),),        0, 0, TypeError)
 
     address_parse(('explicit', None),       0, 0, FileNotFoundError)
     address_parse((3.14, None),             0, 0, TypeError)
-    address_parse((Address(128,0), None),   0, 0, TypeError)
+    address_parse((Address(128, 0), None),   0, 0, TypeError)
 
-    address_parse( 128, 2, 3,               0, 0, TypeError)
+    address_parse(128, 2, 3,               0, 0, TypeError)
     address_parse((128, 2, 3),              0, 0, TypeError)
-    address_parse( 128, 2, 3, 4,            0, 0, TypeError)
+    address_parse(128, 2, 3, 4,            0, 0, TypeError)
     address_parse((128, 2, 3, 4),           0, 0, TypeError)
 
-    address_parse( 3.14, 128,               0, 0, TypeError)
+    address_parse(3.14, 128,               0, 0, TypeError)
     address_parse((3.14, 128),              0, 0, TypeError)
-    address_parse( 128, 3.14,               0, 0, TypeError)
+    address_parse(128, 3.14,               0, 0, TypeError)
     address_parse((128, 3.14),              0, 0, TypeError)
 
-    address_parse( 128, 'explicit',         0, 0, FileNotFoundError)
+    address_parse(128, 'explicit',         0, 0, FileNotFoundError)
     address_parse((128, 'explicit'),        0, 0, FileNotFoundError)
-    address_parse( 'explicit', 128,         0, 0, FileNotFoundError)
+    address_parse('explicit', 128,         0, 0, FileNotFoundError)
     address_parse(('explicit', 128),        0, 0, FileNotFoundError)
 
-    address_parse( 'explicit', 3.14,        0, 0, TypeError)
+    address_parse('explicit', 3.14,        0, 0, TypeError)
     address_parse(('explicit', 3.14),       0, 0, TypeError)
-    address_parse( 3.14, 'explicit',        0, 0, TypeError)
+    address_parse(3.14, 'explicit',        0, 0, TypeError)
     address_parse((3.14, 'explicit'),       0, 0, TypeError)
 
-    address_parse( Address(128, 0),  128,   0, 0, TypeError)
+    address_parse(Address(128, 0),  128,   0, 0, TypeError)
     address_parse((Address(128, 0)), 128,   0, 0, TypeError)
 
-    address_parse( 128, Address(128, 0),    0, 0, TypeError)
+    address_parse(128, Address(128, 0),    0, 0, TypeError)
     address_parse((128, Address(128, 0)),   0, 0, TypeError)
 
 
-
 def do_bad_clients_ports():
-    if verbose: sys.stdout.write("# --- do_bad_clients_ports() ---\n")
+    if verbose:
+        sys.stdout.write("# --- do_bad_clients_ports() ---\n")
     for client in (-1, 256, 'bad_client'):
         for port in (0, -1, 256, 'bad_port'):
             do_variants(client,
@@ -409,7 +406,6 @@ def do_bad_clients_ports():
                         port,
                         FileNotFoundError,
                         has_port_0=False)
-
 
 
 def do_good_client_bad_ports(client_name, client_id):
@@ -427,20 +423,20 @@ def do_good_client_bad_ports(client_name, client_id):
                               client_id,
                               0,
                               TypeError)
-        address_parse( client_name,   port,  client_id, 0, FileNotFoundError)
+        address_parse(client_name,   port,  client_id, 0, FileNotFoundError)
         address_parse((client_name,   port), client_id, 0, FileNotFoundError)
-        address_parse( client_id,     port,  client_id, 0, FileNotFoundError)
+        address_parse(client_id,     port,  client_id, 0, FileNotFoundError)
         address_parse((client_id,     port), client_id, 0, FileNotFoundError)
 
 
-
+@pytest.mark.require_alsa_seq
 def test_sequencer_address():
     global tester
 
-    tester     = alsa_midi.SequencerClient("tester"    )   # all tests use this
+    tester = alsa_midi.SequencerClient("tester")   # all tests use this
     sequential = alsa_midi.SequencerClient("sequential")
-    prefix     = alsa_midi.SequencerClient("seq"       )
-    explicit   = alsa_midi.SequencerClient("explicit"  )
+    prefix = alsa_midi.SequencerClient("seq")
+    explicit = alsa_midi.SequencerClient("explicit")
 
     # First one gets assigned client id 128, must have port
     # with id 0 for do_simple()
@@ -449,10 +445,10 @@ def test_sequencer_address():
     prfx_id = prefix    .get_client_info().client_id
     expl_id = explicit  .get_client_info().client_id
 
-    create_ports(tester    , tester_ports    )
+    create_ports(tester, tester_ports)
     create_ports(sequential, sequential_ports)
-    create_ports(prefix    , prefix_ports    )
-    create_ports(explicit  , explicit_ports  )
+    create_ports(prefix, prefix_ports)
+    create_ports(explicit, explicit_ports)
 
     # sometimes delay before clients/ports actually exist
     # particularly if run in tox/pytest environment
@@ -466,10 +462,9 @@ def test_sequencer_address():
 
     do_addresses("tester",     test_id, tester_ports)
     do_addresses("sequential", seqn_id, sequential_ports)
-    do_addresses("seq",        prfx_id, prefix_ports) # client,port substrings
+    do_addresses("seq",        prfx_id, prefix_ports)  # client,port substrings
     do_addresses("explicit",   expl_id, explicit_ports)
-    do_addresses("expl",       expl_id, explicit_ports) # substrings
-
+    do_addresses("expl",       expl_id, explicit_ports)  # substrings
 
 
 if __name__ == '__main__':
@@ -492,9 +487,10 @@ if __name__ == '__main__':
 
     if opts.pause:
         sys.stdout.write("`aconnect -oil` in separate shell for "
-                             "clients+ports, type ^C here to exit\n")
+                         "clients+ports, type ^C here to exit\n")
         try:
-            while True: pass
+            while True:
+                pass
         except KeyboardInterrupt:
             sys.stdout.write("exiting\n")
 

@@ -422,11 +422,6 @@ class SequencerClientBase:
         assert (pfds[0].events & select.POLLIN) and (pfds[0].events & select.POLLOUT)
         self._fd = pfds[0].fd
 
-    @property
-    def fd(self):
-        "Returns the ALSA sequencer file descriptor number."
-        return self._fd
-
     def _get_event_parser(self):
         parser = self._event_parser
         if parser is None:
@@ -1143,7 +1138,7 @@ class SequencerClientBase:
 
         The result is sorted in a way that the first returned entry should be the 'most usable'
         one for the selected purpose. E.g. when `output` = `True` then the first entry will be
-        a synthesizer input port rather than the dummy 'Midi Through' port. Thisa is still a guess,
+        a synthesizer input port rather than the dummy 'Midi Through' port. This is still a guess,
         though, so in the end the user should be able to choose.
 
         Wraps :alsa:`snd_seq_query_next_client` and :alsa:`snd_seq_query_next_port`.
@@ -1312,51 +1307,74 @@ class SequencerClientBase:
         """
 
         def type_error():
-            raise TypeError("(%s, %s) is not one or two ints and/or "
-                            "strings, or 2-tuple of same, or Address"
+            raise TypeError("resolve_address(%s, %s) is not a single string "
+                            "argument of form 'client:port' (or "
+                            "'client.port') with string client:port names "
+                            "or numeric IDs, or a single Address argument, "
+                            "or two string or int client,port arguments "
+                            "(no ':' 'or '.'), or a single 2-tuple argument "
+                            "of same."
                             % (arg1, arg2))
 
-        if arg2 is None:
-            if isinstance(arg1, str):
-                # remove enclosing single or double quotes if any
-                if arg1.startswith("'"):
-                    arg1 = arg1.strip("'")
-                elif arg1.startswith('"'):
-                    arg1 = arg1.strip('"')
-                # normalize "client.port" to "client:port"
-                if '.' in arg1:
-                    arg1 = arg1.replace('.', ':')
-                # split client and port
-                client_port = arg1.split(':')
-                if len(client_port) == 2:
-                    (client_name, port_name) = client_port
-                else:
-                    client_name = arg1
-                    port_name = None
-            elif isinstance(arg1, int):
-                client_name = arg1
-                port_name = None
-            elif isinstance(arg1, tuple):
-                if arg2 is not None:
-                    type_error()
-                if len(arg1) == 2:
-                    (client_name, port_name) = arg1
-                else:
-                    type_error()
-            elif isinstance(arg1, Address):
-                if arg2 is not None:
-                    type_error()
-                client_name = arg2.client_id  # int will be converted below
-                port_name = arg2.port_id      # same
+        def strip_quotes(arg):
+            # remove enclosing single or double quotes if any
+            if arg.startswith("'"):
+                arg = arg.strip("'")
+            elif arg.startswith('"'):
+                arg = arg.strip('"')
+            return arg
+
+        # Validate arguments ...
+        args_parsed = False
+
+        if isinstance(arg1, Address):
+            if arg2 is not None:
+                type_error()
+            client_name = arg1.client_id  # will be tested and converted
+            port_name = arg1.port_id      # to int below
+            args_parsed = True
+        elif isinstance(arg1, tuple):
+            if arg2 is not None:
+                type_error()
+            if len(arg1) == 2:
+                # treat as separate args so don't have to duplicate
+                # parsing below
+                (arg1, arg2) = arg1
             else:
                 type_error()
-        else:
-            client_name = arg1
-            port_name = arg2
+
+        if not args_parsed:
+            if isinstance(arg2, str):
+                if ':' in arg2 or '.' in arg2:
+                    type_error()
+                arg2 = strip_quotes(arg2)
+            if isinstance(arg1, str):
+                arg1 = strip_quotes(arg1)
+                if ':' in arg1 or '.' in arg1:
+                    if arg2 is not None:
+                        type_error()
+                    # normalize "client.port" to "client:port"
+                    if '.' in arg1:
+                        arg1 = arg1.replace('.', ':')
+                    # split client and port
+                    client_port = arg1.split(':')
+                    if len(client_port) == 2:
+                        (client_name, port_name) = client_port
+                    else:
+                        client_name = arg1
+                        port_name = None
+                else:
+                    client_name = arg1
+                    port_name = arg2    # OK if None
+            else:
+                client_name = arg1
+                port_name = arg2    # OK if None
 
         if not (isinstance(client_name, (int, str))
                 and isinstance(port_name, (int, str, type(None)))):
             type_error()
+
+        # Arguments validated. Continue.
 
         ports = self.list_ports(include_system=True)
 
