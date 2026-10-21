@@ -1250,6 +1250,202 @@ class SequencerClientBase:
 
         return result
 
+    @overload
+    def resolve_address(self, arg1: str) -> 'Address':
+        ...
+
+    @overload
+    def resolve_address(self, arg1: str, arg2: str = '') -> 'Address':
+        ...
+
+    @overload
+    def resolve_address(self, arg1: int, arg2: int = 0) -> 'Address':
+        ...
+
+    @overload
+    def resolve_address(self, arg1: tuple) -> 'Address':
+        ...
+
+    @overload
+    def resolve_address(self, arg1: AddressType) -> 'Address':
+        ...
+
+    def resolve_address(self,
+                        arg1: int | str | tuple | AddressType,
+                        arg2: int | str | None = None) -> Address:
+        """Parse client:port address string
+
+        Similar to Address() but parses client and port by names
+        in addition numeric to ids.
+
+        Raises exception if client:port does not exist.
+
+        Note finds addresses in clients other than self (as per
+        ALSA semantics).
+
+        As per alsa-util library's snd_seq_parse_address():
+        - Accepts "client:port" and "client.port" interchangeably
+        - Returns client_id:0 if found for input without ":" or '.'
+        - Chooses last of possible multiple prefix-matches (if any) with
+          existing client names unless superceded by full exact match.
+        - Will use first of possible multiple exact matching client
+          names (yes, ALSA allows this).
+        - Likewise chooses last of possible multiple prefix-match
+          port names in chosen client unless superceded by exact
+          match, or first of possible multiple exact matches (ALSA
+          allows this, too, even if all are of the same READ, WRITE,
+          READ+WRITE gender).
+        - Does nothing fancy such as searching for the best port name
+          match within multiple candidate client matches.
+        - Raises TypeError for incorrect arguments, FileNotFoundError
+          if specified client:port doesn't exist.
+
+        :param spec: address specification, 'client', 'client:port', 'client.port', etc.
+        :return: Address
+
+        :exceptions: FileNotFoundError, TypeError
+        """
+
+        def type_error():
+            raise TypeError("resolve_address(%s, %s) is not a single string "
+                            "argument of form 'client:port' (or "
+                            "'client.port') with string client:port names "
+                            "or numeric IDs, or a single Address argument, "
+                            "or two string or int client,port arguments "
+                            "(no ':' 'or '.'), or a single 2-tuple argument "
+                            "of same."
+                            % (arg1, arg2))
+
+        def strip_quotes(arg):
+            # remove enclosing single or double quotes if any
+            if arg.startswith("'"):
+                arg = arg.strip("'")
+            elif arg.startswith('"'):
+                arg = arg.strip('"')
+            return arg
+
+        # Validate arguments ...
+        args_parsed = False
+
+        if hasattr(arg1, "client_id"):
+            if arg2 is not None or not hasattr(arg1, "port_id"):
+                type_error()
+            client_name = arg1.client_id  # will be tested and converted
+            port_name = arg1.port_id      # to int below
+            args_parsed = True
+        elif isinstance(arg1, tuple):
+            if arg2 is not None:
+                type_error()
+            if len(arg1) == 2:
+                # treat as separate args so don't have to duplicate
+                # parsing below
+                (arg1, arg2) = arg1
+            else:
+                type_error()
+
+        if not args_parsed:
+            if isinstance(arg2, str):
+                if ':' in arg2 or '.' in arg2:
+                    type_error()
+                arg2 = strip_quotes(arg2)
+            if isinstance(arg1, str):
+                arg1 = strip_quotes(arg1)
+                if ':' in arg1 or '.' in arg1:
+                    if arg2 is not None:
+                        type_error()
+                    # normalize "client.port" to "client:port"
+                    if '.' in arg1:
+                        arg1 = arg1.replace('.', ':')
+                    # split client and port
+                    client_port = arg1.split(':')
+                    if len(client_port) == 2:
+                        (client_name, port_name) = client_port
+                    else:
+                        client_name = arg1
+                        port_name = None
+                else:
+                    client_name = arg1
+                    port_name = arg2    # OK if None
+            else:
+                client_name = arg1
+                port_name = arg2    # OK if None
+
+        if not (isinstance(client_name, (int, str))
+                and isinstance(port_name, (int, str, type(None)))):
+            type_error()
+
+        # Arguments validated. Continue.
+
+        ports = self.list_ports(include_system=True)
+
+        # confirm client exists
+        client_id = None
+        if isinstance(client_name, int):
+            client_id = client_name
+        elif isinstance(client_name, str) and client_name.isdecimal():
+            client_id = int(client_name)
+        else:
+            client_id = None
+
+        best_client = None
+        if client_id is None:
+            for port_info in ports:
+                if port_info.client_name == client_name:
+                    # exact match supercedes prefix matches
+                    # but note can have multiple clients with same name
+                    client_id = port_info.client_id
+                    best_client = port_info
+                    break
+                elif port_info.client_name.startswith(client_name):
+                    # last of multiples will overwrite
+                    client_id = port_info.client_id
+                    best_client = port_info
+        else:
+            for port_info in ports:
+                if port_info.client_id == client_id:
+                    best_client = port_info
+                    break  # can't have multiple clients with same numeric id
+
+        # only return client if exists
+        if client_id is None:
+            raise FileNotFoundError("No ALSA client '%s'" % client_name)
+        elif best_client is None:
+            raise FileNotFoundError("No ALSA client %d" % client_id)
+
+        # find specified port of specified client
+        if isinstance(port_name, int):
+            port_id = port_name
+        elif isinstance(port_name, str) and port_name.isdecimal():
+            port_id = int(port_name)
+        elif port_name is None:
+            port_id = 0   # but still must check that exists
+        else:
+            port_id = None  # find by name
+
+        best_port = None
+        for port_info in ports:
+            if port_info.client_id == best_client.client_id:
+                if port_info.port_id == port_id:
+                    # port id match supercedes name/prefix match
+                    best_port = port_info
+                    break
+                elif port_info.name == port_name:
+                    # exact match supercedes prefix matches
+                    port_id = port_info.port_id
+                    best_port = port_info
+                    break
+                elif isinstance(port_name, str) \
+                        and port_name in port_info.name:
+                    # last of multiples will overwrite
+                    port_id = port_info.port_id
+                    best_port = port_info
+
+        if best_port is None:
+            raise FileNotFoundError("No ALSA client:port %d:%s"
+                                    % (client_id, port_name))
+        else:
+            return Address(client_id, best_port.port_id)
+
     def _subunsub_port(self, func,
                        sender: AddressType, dest: AddressType, *,
                        queue: Queue | int | None = None,
