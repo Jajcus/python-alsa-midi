@@ -72,7 +72,7 @@ jobs:
       run: |
         sudo snap install multipass --classic
         sudo snap wait system seed.loaded
-        sleep 5
+        sleep 15
 
     - name: Start Multipass VM
       run: |
