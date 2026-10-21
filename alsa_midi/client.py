@@ -1327,8 +1327,8 @@ class SequencerClientBase:
         # Validate arguments ...
         args_parsed = False
 
-        if isinstance(arg1, Address):
-            if arg2 is not None:
+        if hasattr(arg1, "client_id"):
+            if arg2 is not None or not hasattr(arg1, "port_id"):
                 type_error()
             client_name = arg1.client_id  # will be tested and converted
             port_name = arg1.port_id      # to int below
