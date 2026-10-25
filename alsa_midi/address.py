@@ -56,7 +56,7 @@ class Address(namedtuple("Address", "client_id port_id")):
         ...
 
     def __new__(cls,
-                arg1: Union[int, str, AddressType, 'SequencerClient'],
+                arg1: int | str | AddressType | 'SequencerClient',
                 arg2: int = 0) -> 'Address':
         if isinstance(arg1, str):
             tple: Any = cls._parse(arg1)

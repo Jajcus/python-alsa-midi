@@ -9,12 +9,14 @@ or set shell variable $MIDO_BACKEND to 'alsa_midi.mido_backend'
 .. _MIDO: https://mido.readthedocs.io/
 """
 
+from __future__ import annotations
+
 import logging
 import queue
 import sys
 import threading
 from collections.abc import MutableMapping
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 from weakref import WeakValueDictionary
 
 from mido.messages import Message
@@ -27,7 +29,7 @@ logger = logging.getLogger("alsa_midi.mido_backend")
 
 
 class _Client:
-    instance: Optional['_Client'] = None
+    instance: '_Client' | None = None
 
     client: alsa_midi.SequencerClient
     in_thread: threading.Thread
@@ -142,10 +144,10 @@ class PortCommon:
 
     _parser: Parser
     _virtual: bool = False
-    _callback: Optional[Callable[[Message], Any]] = None
+    _callback: Callable[[Message], Any] | None = None
 
-    _port: Optional[alsa_midi.Port] = None
-    _dest_port: Optional[alsa_midi.PortInfo] = None
+    _port: alsa_midi.Port | None = None
+    _dest_port: alsa_midi.PortInfo | None = None
     name: str
 
     @classmethod

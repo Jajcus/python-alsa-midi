@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import errno
 import select
@@ -6,7 +8,7 @@ from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
 from functools import partial
-from typing import Any, Callable, NewType, Optional, Union, overload
+from typing import Any, Callable, NewType, overload
 from weakref import WeakValueDictionary
 
 from ._ffi import alsa, ffi
@@ -84,12 +86,12 @@ class ClientInfo:
     name: str = ""
     broadcast_filter: bool = False
     error_bounce: bool = False
-    type: Optional[ClientType] = None
-    card_id: Optional[int] = None
-    pid: Optional[int] = None
+    type: ClientType | None = None
+    card_id: int | None = None
+    pid: int | None = None
     num_ports: int = 0
     event_lost: int = 0
-    event_filter: Optional[set[EventType]] = None
+    event_filter: set[EventType] | None = None
 
     @classmethod
     def _from_alsa(cls, info: _snd_seq_client_info_t):
@@ -336,7 +338,7 @@ class RemoveEvents:
     Represents :alsa:`snd_seq_remove_events_t` data."""
     condition: RemoveCondition = RemoveCondition(0)
     queue_id: int = 0
-    time: Union[RealTime, int] = field(default_factory=RealTime)
+    time: RealTime | int = field(default_factory=RealTime)
     dest: AddressType = Address(0, 0)
     channel: int = 0
     event_type: EventType = EventType.NONE
@@ -359,7 +361,7 @@ class SequencerClientBase:
     handle: _snd_seq_t
     _handle_p: _snd_seq_t_p
     _fd: int = -1
-    _event_parser: Optional[_snd_midi_event_t] = None
+    _event_parser: _snd_midi_event_t | None = None
     _queues: MutableMapping[int, Queue]
 
     def __init__(
@@ -404,6 +406,7 @@ class SequencerClientBase:
         self._handle_p = None  # type: ignore
         self.handle = None  # type: ignore
         self._event_parser = None
+        self._fd = -1
 
     def _get_fds(self):
         """Get the file descriptor number for the client connection into :data:`self._fd`."""
@@ -419,11 +422,6 @@ class SequencerClientBase:
         assert (pfds[0].events & select.POLLIN) and (pfds[0].events & select.POLLOUT)
         self._fd = pfds[0].fd
 
-    @property
-    def fd(self):
-        "Returns the ALSA sequencer file descriptor number."
-        return self._fd
-
     def _get_event_parser(self):
         parser = self._event_parser
         if parser is None:
@@ -434,6 +432,21 @@ class SequencerClientBase:
             alsa.snd_midi_event_no_status(parser, 1)
             self._event_parser = parser
         return parser
+
+    def fileno(self):
+        """Return file descriptor assigned to this connection.
+
+        This file descriptor can be used with select, poll, or other event
+        loop mechanisms for monitoring ALSA sequencer events.
+
+        Wraps :alsa:`snd_seq_poll_descriptors`.
+
+        :return: file descriptor number
+        :raises OSError: if the connection is closed or file descriptor is not available
+        """
+        if self._fd >= 0:
+            return self._fd
+        raise OSError("File descriptor not available")
 
     def get_sequencer_name(self) -> str:
         """Get sequencer name.
@@ -490,13 +503,13 @@ class SequencerClientBase:
                     caps: PortCaps = RW_PORT,
                     type: PortType = DEFAULT_PORT_TYPE,
                     *,
-                    port_id: Optional[int] = None,
-                    midi_channels: Optional[int] = None,
-                    midi_voices: Optional[int] = None,
-                    synth_voices: Optional[int] = None,
-                    timestamping: Optional[bool] = None,
-                    timestamp_real: Optional[bool] = None,
-                    timestamp_queue: Optional[Union[Queue, int]] = None,
+                    port_id: int | None = None,
+                    midi_channels: int | None = None,
+                    midi_voices: int | None = None,
+                    synth_voices: int | None = None,
+                    timestamping: bool | None = None,
+                    timestamp_real: bool | None = None,
+                    timestamp_queue: Queue | int | None = None,
                     ) -> Port:
         """Create a sequencer port.
 
@@ -665,7 +678,7 @@ class SequencerClientBase:
         err = alsa.snd_seq_drop_output_buffer(self.handle)
         _check_alsa_error(err)
 
-    def _event_input(self, prefer_bytes: bool = False) -> tuple[int, Optional[Event]]:
+    def _event_input(self, prefer_bytes: bool = False) -> tuple[int, Event | None]:
         buf = ffi.new("snd_seq_event_t**", ffi.NULL)
         result = alsa.snd_seq_event_input(self.handle, buf)
         if result < 0:
@@ -731,10 +744,10 @@ class SequencerClientBase:
 
     def _prepare_event(self,
                        event: Event,
-                       queue: Union['Queue', int] = None,
-                       port: Union['Port', int] = None,
+                       queue: 'Queue' | int = None,
+                       port: 'Port' | int = None,
                        dest: AddressType = None,
-                       remainder: Optional[Any] = None) -> tuple[_snd_seq_event_t, Any]:
+                       remainder: Any = None) -> tuple[_snd_seq_event_t, Any]:
         """Prepare ALSA :alsa:`snd_seq_event_t` for given `event` object for output.
 
         For :class:`alsa_midi.MidiBytesEvent` may need to be called more than
@@ -781,10 +794,10 @@ class SequencerClientBase:
 
     def _event_output(self,
                       event: Event,
-                      queue: Union['Queue', int] = None,
-                      port: Union['Port', int] = None,
+                      queue: 'Queue' | int = None,
+                      port: 'Port' | int = None,
                       dest: AddressType = None,
-                      remainder: Optional[Any] = None) -> tuple[int, Any]:
+                      remainder: Any = None) -> tuple[int, Any]:
         alsa_event, remainder = self._prepare_event(event,
                                                     queue=queue, port=port, dest=dest,
                                                     remainder=remainder)
@@ -795,8 +808,8 @@ class SequencerClientBase:
 
     def event_output(self,
                      event: Event,
-                     queue: Union['Queue', int] = None,
-                     port: Union['Port', int] = None,
+                     queue: 'Queue' | int = None,
+                     port: 'Port' | int = None,
                      dest: AddressType = None) -> int:
         """Output an event.
 
@@ -828,8 +841,8 @@ class SequencerClientBase:
 
     def event_output_buffer(self,
                             event: Event,
-                            queue: Union['Queue', int] = None,
-                            port: Union['Port', int] = None,
+                            queue: 'Queue' | int = None,
+                            port: 'Port' | int = None,
                             dest: AddressType = None) -> int:
         """Output an event to a buffer.
 
@@ -865,10 +878,10 @@ class SequencerClientBase:
 
     def _event_output_direct(self,
                              event: Event,
-                             queue: Union['Queue', int] = None,
-                             port: Union['Port', int] = None,
+                             queue: 'Queue' | int = None,
+                             port: 'Port' | int = None,
                              dest: AddressType = None,
-                             remainder: Optional[Any] = None) -> tuple[int, Any]:
+                             remainder: Any = None) -> tuple[int, Any]:
         alsa_event, remainder = self._prepare_event(event,
                                                     queue=queue, port=port, dest=dest,
                                                     remainder=remainder)
@@ -879,8 +892,8 @@ class SequencerClientBase:
 
     def event_output_direct(self,
                             event: Event,
-                            queue: Union['Queue', int] = None,
-                            port: Union['Port', int] = None,
+                            queue: 'Queue' | int = None,
+                            port: 'Port' | int = None,
                             dest: AddressType = None) -> int:
         """Output an event directly to the sequencer.
 
@@ -949,7 +962,7 @@ class SequencerClientBase:
         result = SystemInfo._from_alsa(info)
         return result
 
-    def get_client_info(self, client_id: Optional[int] = None) -> ClientInfo:
+    def get_client_info(self, client_id: int | None = None) -> ClientInfo:
         """Obtain information about a client.
 
         Wraps :alsa:`snd_seq_get_client_info` or :alsa:`snd_seq_get_any_client_info`.
@@ -994,15 +1007,15 @@ class SequencerClientBase:
         _check_alsa_error(err)
 
     @overload
-    def query_next_client(self, previous: ClientInfo) -> Optional[ClientInfo]:
+    def query_next_client(self, previous: ClientInfo) -> ClientInfo | None:
         ...
 
     @overload
-    def query_next_client(self, previous: Optional[int] = None) -> Optional[ClientInfo]:
+    def query_next_client(self, previous: int | None = None) -> ClientInfo | None:
         ...
 
-    def query_next_client(self, previous: Optional[Union[ClientInfo, int]] = None
-                          ) -> Optional[ClientInfo]:
+    def query_next_client(self, previous: ClientInfo | int | None = None
+                          ) -> ClientInfo | None:
         """Obtain information about the first or the next sequencer client.
 
         Wraps :alsa:`snd_seq_query_next_client`.
@@ -1027,7 +1040,7 @@ class SequencerClientBase:
         result = ClientInfo._from_alsa(info)
         return result
 
-    def get_port_info(self, port: Union[int, AddressType]) -> PortInfo:
+    def get_port_info(self, port: int | AddressType) -> PortInfo:
         """Obtain information about a specific port.
 
         Wraps :alsa:`snd_seq_get_port_info` or :alsa:`snd_seq_get_any_port_info`.
@@ -1053,7 +1066,7 @@ class SequencerClientBase:
         result = PortInfo._from_alsa(info)
         return result
 
-    def set_port_info(self, port: Union[int, Port], info: PortInfo):
+    def set_port_info(self, port: int | Port, info: PortInfo):
         """Set information about a specific own port.
 
         Wraps :alsa:`snd_seq_set_port_info`.
@@ -1068,18 +1081,18 @@ class SequencerClientBase:
 
     @overload
     def query_next_port(self, client_id: int, previous: PortInfo
-                        ) -> Optional[PortInfo]:
+                        ) -> PortInfo | None:
         ...
 
     @overload
-    def query_next_port(self, client_id: int, previous: Optional[int] = None
-                        ) -> Optional[PortInfo]:
+    def query_next_port(self, client_id: int, previous: int | None = None
+                        ) -> PortInfo | None:
         ...
 
     def query_next_port(self,
                         client_id: int,
-                        previous: Optional[Union[PortInfo, int]] = None
-                        ) -> Optional[PortInfo]:
+                        previous: PortInfo | int | None = None
+                        ) -> PortInfo | None:
         """Obtain information about the first or the next port of a sequencer client.
 
         Wraps :alsa:`snd_seq_query_next_port`.
@@ -1164,7 +1177,7 @@ class SequencerClientBase:
                    include_midi_through: bool = True,
                    include_no_export: bool = True,
                    only_connectable: bool = True,
-                   sort: Union[bool, Callable[[PortInfo], Any]] = True,
+                   sort: bool | Callable[[PortInfo], Any] = True,
                    ) -> list[PortInfo]:
         """More friendly interface to list available ports.
 
@@ -1172,7 +1185,7 @@ class SequencerClientBase:
 
         The result is sorted in a way that the first returned entry should be the 'most usable'
         one for the selected purpose. E.g. when `output` = `True` then the first entry will be
-        a synthesizer input port rather than the dummy 'Midi Through' port. Thisa is still a guess,
+        a synthesizer input port rather than the dummy 'Midi Through' port. This is still a guess,
         though, so in the end the user should be able to choose.
 
         Wraps :alsa:`snd_seq_query_next_client` and :alsa:`snd_seq_query_next_port`.
@@ -1311,8 +1324,8 @@ class SequencerClientBase:
         ...
 
     def resolve_address(self,
-                        arg1: Union[int, str, tuple, AddressType],
-                        arg2: Union[int, str, None] = None) -> Address:
+                        arg1: int | str | tuple | AddressType,
+                        arg2: int | str | None = None) -> Address:
         """Parse client:port address string
 
         Similar to Address() but parses client and port by names
@@ -1347,51 +1360,74 @@ class SequencerClientBase:
         """
 
         def type_error():
-            raise TypeError("(%s, %s) is not one or two ints and/or "
-                            "strings, or 2-tuple of same, or Address"
+            raise TypeError("resolve_address(%s, %s) is not a single string "
+                            "argument of form 'client:port' (or "
+                            "'client.port') with string client:port names "
+                            "or numeric IDs, or a single Address argument, "
+                            "or two string or int client,port arguments "
+                            "(no ':' 'or '.'), or a single 2-tuple argument "
+                            "of same."
                             % (arg1, arg2))
 
-        if arg2 is None:
-            if isinstance(arg1, str):
-                # remove enclosing single or double quotes if any
-                if arg1.startswith("'"):
-                    arg1 = arg1.strip("'")
-                elif arg1.startswith('"'):
-                    arg1 = arg1.strip('"')
-                # normalize "client.port" to "client:port"
-                if '.' in arg1:
-                    arg1 = arg1.replace('.', ':')
-                # split client and port
-                client_port = arg1.split(':')
-                if len(client_port) == 2:
-                    (client_name, port_name) = client_port
-                else:
-                    client_name = arg1
-                    port_name = None
-            elif isinstance(arg1, int):
-                client_name = arg1
-                port_name = None
-            elif isinstance(arg1, tuple):
-                if arg2 is not None:
-                    type_error()
-                if len(arg1) == 2:
-                    (client_name, port_name) = arg1
-                else:
-                    type_error()
-            elif isinstance(arg1, Address):
-                if arg2 is not None:
-                    type_error()
-                client_name = arg2.client_id  # int will be converted below
-                port_name = arg2.port_id      # same
+        def strip_quotes(arg):
+            # remove enclosing single or double quotes if any
+            if arg.startswith("'"):
+                arg = arg.strip("'")
+            elif arg.startswith('"'):
+                arg = arg.strip('"')
+            return arg
+
+        # Validate arguments ...
+        args_parsed = False
+
+        if isinstance(arg1, Address):
+            if arg2 is not None:
+                type_error()
+            client_name = arg1.client_id  # will be tested and converted
+            port_name = arg1.port_id      # to int below
+            args_parsed = True
+        elif isinstance(arg1, tuple):
+            if arg2 is not None:
+                type_error()
+            if len(arg1) == 2:
+                # treat as separate args so don't have to duplicate
+                # parsing below
+                (arg1, arg2) = arg1
             else:
                 type_error()
-        else:
-            client_name = arg1
-            port_name = arg2
+
+        if not args_parsed:
+            if isinstance(arg2, str):
+                if ':' in arg2 or '.' in arg2:
+                    type_error()
+                arg2 = strip_quotes(arg2)
+            if isinstance(arg1, str):
+                arg1 = strip_quotes(arg1)
+                if ':' in arg1 or '.' in arg1:
+                    if arg2 is not None:
+                        type_error()
+                    # normalize "client.port" to "client:port"
+                    if '.' in arg1:
+                        arg1 = arg1.replace('.', ':')
+                    # split client and port
+                    client_port = arg1.split(':')
+                    if len(client_port) == 2:
+                        (client_name, port_name) = client_port
+                    else:
+                        client_name = arg1
+                        port_name = None
+                else:
+                    client_name = arg1
+                    port_name = arg2    # OK if None
+            else:
+                client_name = arg1
+                port_name = arg2    # OK if None
 
         if not (isinstance(client_name, (int, str))
                 and isinstance(port_name, (int, str, type(None)))):
             type_error()
+
+        # Arguments validated. Continue.
 
         ports = self.list_ports(include_system=True)
 
@@ -1465,7 +1501,7 @@ class SequencerClientBase:
 
     def _subunsub_port(self, func,
                        sender: AddressType, dest: AddressType, *,
-                       queue: Optional[Union[Queue, int]] = None,
+                       queue: Queue | int | None = None,
                        exclusive: bool = False,
                        time_update: bool = False,
                        time_real: bool = False):
@@ -1493,7 +1529,7 @@ class SequencerClientBase:
         _check_alsa_error(err)
 
     def subscribe_port(self, sender: AddressType, dest: AddressType, *,
-                       queue: Optional[Union[Queue, int]] = None,
+                       queue: Queue | int | None = None,
                        exclusive: bool = False,
                        time_update: bool = False,
                        time_real: bool = False):
@@ -1556,7 +1592,7 @@ class SequencerClientBase:
 
     def list_port_subscribers(self,
                               port: AddressType,
-                              type: Optional[SubscriptionQueryType] = None,
+                              type: SubscriptionQueryType | None = None,
                               ) -> list[SubscriptionQuery]:
         """Lists subscribers accessing a port.
 
@@ -1719,8 +1755,8 @@ class SequencerClientBase:
     @overload
     def remove_events(self,
                       condition: RemoveCondition = None,
-                      queue: Union[Queue, int] = None,
-                      time: RealTime = None,
+                      queue: Queue | int = None,
+                      time: RealTime | int = None,
                       dest: AddressType = None,
                       channel: int = None,
                       event_type: EventType = None,
@@ -1731,9 +1767,9 @@ class SequencerClientBase:
         ...
 
     def remove_events(self,
-                      condition: Union[RemoveEvents, RemoveCondition] = None,
-                      queue: Union[Queue, int] = None,
-                      time: Union[RealTime, int] = None,
+                      condition: RemoveEvents | RemoveCondition = None,
+                      queue: Queue | int = None,
+                      time: RealTime | int = None,
                       dest: AddressType = None,
                       channel: int = None,
                       event_type: EventType = None,
@@ -1855,8 +1891,8 @@ class SequencerClient(SequencerClientBase):
         self._write_poll = select.poll()
         self._write_poll.register(self._fd, select.POLLOUT)
 
-    def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None
-                    ) -> Optional[Event]:
+    def event_input(self, prefer_bytes: bool = False, timeout: float | None = None
+                    ) -> Event | None:
         """Wait for and receive an incoming event.
 
         Wraps :alsa:`snd_seq_event_input` and :alsa:`snd_midi_event_decode` when `prefer_bytes` is
@@ -1892,10 +1928,10 @@ class SequencerClient(SequencerClientBase):
         ...
 
     @overload
-    def _event_output_wait(self, func, timeout: float) -> Union[int, None]:
+    def _event_output_wait(self, func, timeout: float) -> int | None:
         ...
 
-    def _event_output_wait(self, func, timeout: Optional[float] = None) -> Union[int, None]:
+    def _event_output_wait(self, func, timeout: float | None = None) -> int | None:
         if timeout:
             until = time.monotonic() + timeout
         else:
@@ -1937,8 +1973,8 @@ class SequencerClient(SequencerClientBase):
 
     def event_output(self,
                      event: Event,
-                     queue: Union['Queue', int] = None,
-                     port: Union['Port', int] = None,
+                     queue: 'Queue' | int = None,
+                     port: 'Port' | int = None,
                      dest: AddressType = None) -> int:
         """Output an event.
 
@@ -1964,8 +2000,8 @@ class SequencerClient(SequencerClientBase):
 
     def event_output_direct(self,
                             event: Event,
-                            queue: Union['Queue', int] = None,
-                            port: Union['Port', int] = None,
+                            queue: 'Queue' | int = None,
+                            port: 'Port' | int = None,
                             dest: AddressType = None) -> int:
         """Output an event without buffering.
 
@@ -2015,8 +2051,8 @@ class AsyncSequencerClient(SequencerClientBase):
         """
         self.close()
 
-    async def event_input(self, prefer_bytes: bool = False, timeout: Optional[float] = None
-                          ) -> Optional[Event]:
+    async def event_input(self, prefer_bytes: bool = False, timeout: float | None = None
+                          ) -> Event | None:
         """Wait for and receive an incoming event.
 
         Wraps :alsa:`snd_seq_event_input` and alsa:`snd_midi_event_decode` when `prefer_bytes` is
@@ -2068,10 +2104,10 @@ class AsyncSequencerClient(SequencerClientBase):
         ...
 
     @overload
-    async def _event_output_wait(self, func, timeout: float) -> Union[int, None]:
+    async def _event_output_wait(self, func, timeout: float) -> int | None:
         ...
 
-    async def _event_output_wait(self, func, timeout: Optional[float] = None) -> Union[int, None]:
+    async def _event_output_wait(self, func, timeout: float | None = None) -> int | None:
         result, remainder = func()
         if result != -errno.EAGAIN and remainder is None:
             _check_alsa_error(result)
@@ -2129,8 +2165,8 @@ class AsyncSequencerClient(SequencerClientBase):
 
     async def event_output(self,
                            event: Event,
-                           queue: Union['Queue', int] = None,
-                           port: Union['Port', int] = None,
+                           queue: 'Queue' | int = None,
+                           port: 'Port' | int = None,
                            dest: AddressType = None) -> int:
         """Output an event.
 
@@ -2156,8 +2192,8 @@ class AsyncSequencerClient(SequencerClientBase):
 
     async def event_output_direct(self,
                                   event: Event,
-                                  queue: Union['Queue', int] = None,
-                                  port: Union['Port', int] = None,
+                                  queue: 'Queue' | int = None,
+                                  port: 'Port' | int = None,
                                   dest: AddressType = None) -> int:
         """Output an event without buffering.
 

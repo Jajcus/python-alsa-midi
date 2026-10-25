@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import InitVar, dataclass, field
 from enum import IntFlag
 from typing import TYPE_CHECKING, Any, Callable, NewType, Optional
@@ -83,7 +85,7 @@ class Port:
     :ivar port_id: port identifier
     """
 
-    client: Optional['SequencerClientBase']
+    client: 'SequencerClientBase' | None
     client_id: int
     port_id: int
 

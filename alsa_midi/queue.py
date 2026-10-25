@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import TYPE_CHECKING, NamedTuple, NewType, Optional, Union
+from typing import TYPE_CHECKING, NamedTuple, NewType
 
 from ._ffi import alsa, ffi
 from .event import EventType, RealTime
@@ -128,8 +130,8 @@ class QueueTempo:
 
     tempo: int = 500000
     ppq: int = 96
-    skew: Optional[int] = None
-    skew_base: Optional[int] = None
+    skew: int | None = None
+    skew_base: int | None = None
 
     @classmethod
     def _from_alsa(cls, tempo: _snd_seq_queue_tempo_t):
@@ -245,11 +247,11 @@ class Queue:
     release or free on close).
     """
 
-    client: Optional['SequencerClientBase']
+    client: 'SequencerClientBase' | None
     queue_id: int
-    _own: Optional[bool]
+    _own: bool | None
 
-    def __init__(self, client: 'SequencerClientBase', queue_id: int, *, _own: bool = None):
+    def __init__(self, client: 'SequencerClientBase', queue_id: int, *, _own: bool | None = None):
         self.client = client
         self.queue_id = queue_id
         self._own = _own
@@ -287,8 +289,8 @@ class Queue:
             else:
                 alsa.snd_seq_set_queue_usage(handle, queue, 0)
 
-    def set_tempo(self, tempo: Union[int, QueueTempo] = None, ppq: int = None,
-                  skew=None, skew_base=None, bpm=None):
+    def set_tempo(self, tempo: int | QueueTempo = None, ppq: int | None = None,
+                  skew: int | None = None, skew_base: int | None = None, bpm: float | None = None):
         """Set the tempo of the queue.
 
         :param tempo: MIDI tempo – microseconds per quarter note

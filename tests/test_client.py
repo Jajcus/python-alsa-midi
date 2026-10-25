@@ -611,3 +611,43 @@ def test_set_client_pool_input():
     client.set_client_pool_input(200)
     pool = client.get_client_pool()
     assert pool.input_pool == 200
+
+
+@pytest.mark.require_alsa_seq
+def test_fileno():
+    client = SequencerClient("test")
+    fd = client.fileno()
+    assert isinstance(fd, int)
+    assert fd >= 0
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_fileno_after_close():
+    client = SequencerClient("test")
+    fd = client.fileno()
+    assert fd >= 0
+    client.close()
+    with pytest.raises(OSError) as exc_info:
+        client.fileno()
+    assert "File descriptor not available" in str(exc_info.value)
+
+
+@pytest.mark.require_alsa_seq
+def test_fileno_async_client():
+    client = AsyncSequencerClient("test")
+    fd = client.fileno()
+    assert isinstance(fd, int)
+    assert fd >= 0
+    client.close()
+
+
+@pytest.mark.require_alsa_seq
+def test_fileno_async_client_after_close():
+    client = AsyncSequencerClient("test")
+    fd = client.fileno()
+    assert fd >= 0
+    client.close()
+    with pytest.raises(OSError) as exc_info:
+        client.fileno()
+    assert "File descriptor not available" in str(exc_info.value)

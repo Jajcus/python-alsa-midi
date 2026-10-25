@@ -19,7 +19,7 @@ from .event import (ActiveSensingEvent, BounceEvent, ChannelPressureEvent, Clien
                     TimeSignatureEvent, TuneRequestEvent, UserVar0Event, UserVar1Event,
                     UserVar2Event, UserVar3Event, UserVar4Event)
 from .exceptions import ALSAError, Error, StateError
-from .port import READ_PORT, RW_PORT, WRITE_PORT, Port, PortCaps, PortInfo, PortType
+from .port import READ_PORT, RW_PORT, WRITE_PORT, Port, PortCaps, PortDirection, PortInfo, PortType
 from .queue import Queue, QueueInfo, QueueStatus, QueueTempo, QueueTimer, QueueTimerType
 
 __all__ = [
@@ -29,7 +29,7 @@ __all__ = [
         "RemoveCondition",
         "RealTime", "EventType", "EventFlags", "Event", "MidiBytesEvent",
         "Error", "StateError", "ALSAError",
-        "Port", "PortCaps", "PortType", "PortInfo",
+        "Port", "PortCaps", "PortDirection", "PortType", "PortInfo",
         "READ_PORT", "WRITE_PORT", "RW_PORT",
         "Queue", "QueueInfo", "QueueStatus", "QueueTempo", "QueueTimer", "QueueTimerType",
         "alsa", "ffi",
