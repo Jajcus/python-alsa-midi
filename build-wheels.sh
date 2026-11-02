@@ -57,7 +57,7 @@ fi
 git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
 # Compile wheels
-for PYBIN in /opt/python/cp{39,310,311,312,313,314}*/bin; do
+for PYBIN in /opt/python/cp{310,311,312,313,314}*/bin; do
     [ -d "$PYBIN" ] || continue
     if [[ "$PYBIN" =~ 313t ]] ; then
       echo "Skipping 313t variant, as it is incompatible with cffi"
@@ -80,7 +80,7 @@ rm wheelhouse/*-linux_*.whl
 
 # Install packages and test
 cd /
-for PYBIN in /opt/python/cp{39,310,311,312,313,314}*/bin/; do
+for PYBIN in /opt/python/cp{310,311,312,313,314}*/bin/; do
     [ -d "$PYBIN" ] || continue
     if [[ "$PYBIN" =~ 313t ]] ; then
       echo "Skipping 313t variant, as it is incompatible with cffi"
