@@ -13,28 +13,28 @@ from alsa_midi import SequencerClient,      \
     ALSAError,            \
     ClientInfo,           \
     ClientType,           \
-    PortDirection,        \
+    PortCaps,             \
     PortInfo,             \
     PortType,             \
     SubscriptionQueryType
 
-program_name: str = ""
+program_name: str = __name__
 aconnect:     SequencerClient
 clients:      dict[int,      ClientInfo] = {}  # client_id: CLientInfo
 ports:        dict[int, list[PortInfo]] = {}  # client_id: [PortInfos]
 indenter:     textwrap.TextWrapper
 
 
-def direction(raw: PortDirection) -> str:
+def direction(raw: PortCaps) -> str:
     "ALSA names for input vs output are backwards."
-    if raw.name == 'INPUT':
-        return 'OUTPUT'
-    elif raw.name == 'OUTPUT':
+    if raw & (PortCaps.READ | PortCaps.WRITE) == PortCaps.READ | PortCaps.WRITE:
+        return 'BIDIR'
+    elif raw & PortCaps.WRITE == PortCaps.WRITE:
         return 'INPUT'
-    elif raw.name is None:
-        return '???'
+    elif raw & PortCaps.READ == PortCaps.READ:
+        return 'OUTPUT'
     else:
-        return raw.name
+        return '???'
 
 
 def indent(text: str) -> None:
@@ -45,9 +45,9 @@ def indent(text: str) -> None:
     sys.stdout.write('%s\n' % indenter.fill(text))
 
 
-def init(term_width: int) -> None:
+def init(term_width: int = 0) -> None:
     "Inititialize global client and textwrap object."
-    global program_name, aconnect, indenter
+    global aconnect, indenter
     aconnect = SequencerClient(program_name)
     width = term_width      \
         if term_width > 0  \
@@ -72,7 +72,6 @@ def get_clients(client_list: list[ClientInfo] | None = None) -> None:
 
 def get_ports() -> None:
     "Populate ports dict"
-    global aconnect, ports
 
     # Need ports for system clients in to get client:port names
     # for non-system ports connected to system ones.
@@ -109,8 +108,6 @@ def print_client(client:       ClientInfo,
 
     :return: Total number of connections for all ports of client
     """
-
-    global ports
 
     if not client_only and not ports:
         get_ports()
@@ -158,13 +155,13 @@ def print_client(client:       ClientInfo,
     num_connections = 0
     if ports and client_id in ports:
         for port in ports[client_id]:
-            if inputs_only and port.direction == PortDirection.INPUT:   # sic
+            if inputs_only and (port.capability & PortCaps.WRITE != PortCaps.WRITE): # sic
                 continue
-            if outputs_only and port.direction == PortDirection.OUTPUT:  # sic
+            if outputs_only and (port.capability & PortCaps.READ != PortCaps.READ): # sic
                 continue
             port_str = (f"  {port.port_id:>3}: "
                         f"{port.name!r:<{max_name_len+3}} "
-                        f"{direction(port.direction)}")
+                        f"{direction(port.capability)}")
             if port_type is None:
                 port_str += f" {port.type.name}"
             if full_info:
@@ -194,7 +191,6 @@ def print_connections(address:   Address,
     """Print port's connections.
     :return: Number of connections
     """
-    global indenter
 
     subs = aconnect.list_port_subscribers(address)
     for sub in subs:
@@ -251,8 +247,6 @@ def print_clients(
     :return: Total number of connections for all ports of all clients
     """
 
-    global aconnect, clients, ports
-
     if not clients:
         get_clients()
 
@@ -286,7 +280,10 @@ def print_clients(
     max_name_len = 0
     max_type_len = 0
     for client_id in client_ids:
-        client = clients[client_id]
+        try:
+            client = clients[client_id]
+        except KeyError:
+            raise Exception(f"No client with ID {client_id}")
         if client.type == ClientType.KERNEL and not kernel_clients:
             continue
         if 'PipeWire' in client.name and not pipewire_clients:
@@ -328,8 +325,6 @@ def connect(clients_ports:  list[str],
             queue:          int = 0) -> None:
     "Connect one client:port to or from another_client:another_port"
 
-    global aconnect
-
     assert len(clients_ports) == 2, \
         "Must have exactly two clients:ports to connect"
 
@@ -338,9 +333,14 @@ def connect(clients_ports:  list[str],
 
     try:
         source_addr = aconnect.resolve_address(source)
+    except Exception:
+        raise ALSAError(f"Bad or non-existent sender '{source}'", errno.ENOENT)
+
+    try:
         sink_addr = aconnect.resolve_address(sink)
-    except ALSAError as e:
-        raise ALSAError("Bad or non-existent source and/or sink", errno.ENOENT)
+    except Exception:
+        raise ALSAError(f"Bad or non-existent receiver '{sink}'",
+                        errno.ENOENT)
 
     try:
         aconnect.subscribe_port(source_addr,
@@ -349,7 +349,7 @@ def connect(clients_ports:  list[str],
                                 exclusive=exclusive,
                                 time_update=time_update,
                                 time_real=time_real)
-    except ALSAError as e:
+    except Exception:
         raise ALSAError(f"Can't connect {source}({source_addr}) -> "
                         f"{sink}({sink_addr}) (not output->input? "
                         "already connected?)",
@@ -385,17 +385,15 @@ def remove_connection(source: str | Address,
                       sink:   str | Address):
     "Disconnect single clientA:portA -> clientB:portB connection."
 
-    global aconnect
-
     try:
         source_addr = aconnect.resolve_address(source)
         sink_addr = aconnect.resolve_address(sink)
-    except ALSAError as e:
+    except Exception:
         raise ALSAError("Bad or non-existent source and/or sink", errno.EINVAL)
 
     try:
         aconnect.unsubscribe_port(source_addr, sink_addr)
-    except ALSAError as e:
+    except Exception:
         raise ALSAError(f"Can't disconnect {source}->{sink} "
                         f"(not connected? or reversed {sink}->"
                         f"{source}?)",
@@ -410,11 +408,9 @@ def remove_port_connections(client_port: str,
                       user confirmation.
     """
 
-    global aconnect, clients, ports
-
     try:
         address = aconnect.resolve_address(client_port)
-    except Exception as e:
+    except Exception:
         raise ALSAError(f"Bad or non-existent client:port '{client_port}'",
                         errno.EINVAL)
 
@@ -442,7 +438,7 @@ def remove_port_connections(client_port: str,
 
         sys.stdout.write(f"  {port.port_id:>3}: "
                          f"{port.name!r:<{max_port_len+3}} "
-                         f"{direction(port.direction)}\n")
+                         f"{direction(port.capability)}\n")
         count = print_connections(address)
 
         if count == 0:
@@ -468,10 +464,8 @@ def remove_client_connections(client:    str | int,
                       user confirmation.
     """
 
-    global aconnect, clients, ports
-
     # check that is just client (no port)
-    if not isinstance(client, int):
+    if isinstance(client, str):
         assert not any(char in client for char in '.:'), \
             "Specify client, not client:port"
 
@@ -545,8 +539,6 @@ def remove_all_connections(no_safety: bool) -> None:
     :param no_safety: Do not print connections to be removed and input
                       user confirmation.
     """
-
-    global aconnect, program_name
 
     if not no_safety:
         count = print_clients()
@@ -667,7 +659,7 @@ if __name__ == '__main__':
                           opts.outputs,
                           opts.full)
     except Exception as e:
-        sys.stderr.write(f"{e}\n")
+        sys.stderr.write(f"{program_name}: {e}\n")
         sys.stderr.write(f"'{program_name} -h' for help and options\n")
         sys.exit(1)
 

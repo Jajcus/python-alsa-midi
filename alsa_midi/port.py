@@ -15,14 +15,6 @@ if TYPE_CHECKING:
 #
 
 
-class PortDirection(IntFlag):
-    """Port directions."""
-    UNKNOWN = alsa.SND_SEQ_PORT_DIR_UNKNOWN
-    INPUT = alsa.SND_SEQ_PORT_DIR_INPUT
-    OUTPUT = alsa.SND_SEQ_PORT_DIR_OUTPUT
-    BIDIR = alsa.SND_SEQ_PORT_DIR_BIDIRECTION
-
-
 class PortCaps(IntFlag):
     """Port capability flags."""
     _NONE = 0
@@ -210,7 +202,6 @@ class PortInfo:
     :ivar client_id: client identifier
     :ivar port_id: port identifier
     :ivar name: port name
-    :ivar direction: port direction
     :ivar capability: port capabilities
     :ivar type: port type
     :ivar midi_channels: number of MIDI channels
@@ -232,7 +223,6 @@ class PortInfo:
     client_id: int = 0
     port_id: Optional[int] = None
     name: str = ""
-    direction: PortDirection = PortDirection.UNKNOWN
     capability: PortCaps = PortCaps._NONE
     type: PortType = PortType.ANY
     midi_channels: int = 0
@@ -261,14 +251,12 @@ class PortInfo:
     @classmethod
     def _from_alsa(cls, info: _snd_seq_port_info_t):
         name = ffi.string(alsa.snd_seq_port_info_get_name(info))
-        direction = alsa.snd_seq_port_info_get_direction(info)
         caps = alsa.snd_seq_port_info_get_capability(info)
         p_type = alsa.snd_seq_port_info_get_type(info)
         return cls(
                 client_id=alsa.snd_seq_port_info_get_client(info),
                 port_id=alsa.snd_seq_port_info_get_port(info),
                 name=name.decode(),
-                direction=PortDirection(direction),
                 capability=PortCaps(caps),
                 type=PortType(p_type),
                 midi_channels=alsa.snd_seq_port_info_get_midi_channels(info),
@@ -289,7 +277,6 @@ class PortInfo:
         alsa.snd_seq_port_info_set_client(info, self.client_id)
         alsa.snd_seq_port_info_set_port(info, self.port_id if self.port_id is not None else 0)
         alsa.snd_seq_port_info_set_name(info, self.name.encode())
-        alsa.snd_seq_port_info_set_direction(info, self.direction)
         alsa.snd_seq_port_info_set_capability(info, self.capability)
         alsa.snd_seq_port_info_set_type(info, self.type)
         alsa.snd_seq_port_info_set_midi_channels(info, self.midi_channels)
@@ -317,7 +304,7 @@ def get_port_info_sort_key(preferred_types: list[PortType] = []
     return key
 
 
-__all__ = ["PortDirection", "PortCaps", "PortType", "Port",
+__all__ = ["PortCaps", "PortType", "Port",
            "READ_PORT", "WRITE_PORT", "RW_PORT", "DEFAULT_PORT_TYPE",
            "READ_PORT_PREFERRED_TYPES", "WRITE_PORT_PREFERRED_TYPES", "RW_PORT_PREFERRED_TYPES",
            "PortInfo"]
