@@ -1122,11 +1122,58 @@ class SequencerClientBase:
         result = PortInfo._from_alsa(info)
         return result
 
+    def list_clients(self, *,
+                     include_system: bool = False,
+                     include_kernel: bool = False,
+                     include_midi_through: bool = True,
+                     ) -> list[ClientInfo]:
+        """More friendly interface to list available clients..
+        :param include_system: include system clients
+        :param include_midi_through: include 'midi through' ports
+
+        :return: list of client information
+        """
+
+        result = []
+        self._check_handle()
+
+        client_ainfo_p = ffi.new("snd_seq_client_info_t **")
+        err = alsa.snd_seq_client_info_malloc(client_ainfo_p)
+        _check_alsa_error(err)
+        client_ainfo = ffi.gc(client_ainfo_p[0], alsa.snd_seq_client_info_free)
+
+        alsa.snd_seq_client_info_set_client(client_ainfo, -1)
+        while True:
+            err = alsa.snd_seq_query_next_client(self.handle, client_ainfo)
+            if err == -errno.ENOENT:
+                break
+            _check_alsa_error(err)
+
+            client_id = alsa.snd_seq_client_info_get_client(client_ainfo)
+            if client_id == 0 and not include_system:
+                continue
+
+            client_name = alsa.snd_seq_client_info_get_name(client_ainfo)
+            client_name = ffi.string(client_name).decode()
+
+            if client_name == "Midi Through" and not include_midi_through:
+                continue
+
+            client_info = ClientInfo._from_alsa(client_ainfo)
+
+            if client_info.type == ClientType.KERNEL and not include_kernel:
+                continue
+
+            result.append(client_info)
+
+        return result
+
     def list_ports(self, *,
                    input: bool = None,
                    output: bool = None,
                    type: PortType = PortType.MIDI_GENERIC,
                    include_system: bool = False,
+                   include_kernel: bool = False,
                    include_midi_through: bool = True,
                    include_no_export: bool = True,
                    only_connectable: bool = True,
@@ -1147,6 +1194,7 @@ class SequencerClientBase:
         :param output: return ports usable for event output (`PortCaps.WRITE`)
         :param type: limit ouput to ports of this type
         :param include_system: include system ports
+        :param include_kernel: include kernel ports
         :param include_midi_through: include 'midi through' ports
         :param include_no_export: include 'no export' ports
         :param only_connectable: only list ports that can be connected to/from
@@ -1176,7 +1224,12 @@ class SequencerClientBase:
             _check_alsa_error(err)
 
             client_id = alsa.snd_seq_client_info_get_client(client_ainfo)
+
             if client_id == 0 and not include_system:
+                continue
+
+            client_type = alsa.snd_seq_client_info_get_type(client_ainfo)
+            if client_type & alsa.SND_SEQ_KERNEL_CLIENT and not include_kernel:
                 continue
 
             client_name = alsa.snd_seq_client_info_get_name(client_ainfo)

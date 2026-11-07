@@ -12,6 +12,8 @@ from .util import _check_alsa_error
 if TYPE_CHECKING:
     from .client import SequencerClientBase, SubscriptionQuery, SubscriptionQueryType, _snd_seq_t
 
+#
+
 
 class PortCaps(IntFlag):
     """Port capability flags."""
